@@ -467,6 +467,9 @@ class QuizApp:
         self.options_text.delete("1.0", tk.END)
         self.options_text.insert(tk.END, "\n".join(options_with_asterisks))
 
+        # Now manually trigger the scrollbar update
+        self.toggle_scrollbars(self.options_text, self.options_scrollbar, self.options_h_scrollbar)
+
         self.explanation_text.delete("1.0", tk.END)
         self.explanation_text.insert(tk.END, question_data["explanation"])
 
