@@ -1,4 +1,6 @@
 import sys
+import csv
+import io
 
 def hide_console_window():
     if sys.platform == "win32":
@@ -58,6 +60,12 @@ class QuizApp:
 
         # Set up Flashcards Tab
         self.setup_flashcards_tab()
+
+        # Create custom styles for question tracker buttons
+        style = ttk.Style()
+        style.configure('Unanswered.TButton', background='gray')
+        style.configure('Answered.TButton', background='green')
+        style.configure('Flagged.TButton', background='yellow')
 
     def focus_next_widget(self, event):
         """Move focus to the next widget."""
@@ -228,7 +236,6 @@ class QuizApp:
         self.generate_button = ttk.Button(self.question_bank_frame, text="Generate Quiz", command=self.generate_quiz)
         self.generate_button.grid(row=3, column=1, pady=5, sticky="e")
 
-
     def setup_flashcards_tab(self):
         # Allow flashcards_tab to expand in both directions
         self.flashcards_tab.columnconfigure(0, weight=1)
@@ -244,11 +251,8 @@ class QuizApp:
 
         # Left section: Input fields (Question, Answer)
         self.flashcards_input_frame = ttk.Frame(self.flashcards_main_frame)
-        # Let this input frame fill all available space on the left
         self.flashcards_input_frame.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
         self.flashcards_input_frame.columnconfigure(0, weight=1)
-        # We'll give both question and answer rows equal weight so they share vertical space
-        # Let's say question is row 1 and answer is row 3, both get weight=1:
         self.flashcards_input_frame.rowconfigure(1, weight=1)
         self.flashcards_input_frame.rowconfigure(3, weight=1)
 
@@ -261,7 +265,6 @@ class QuizApp:
         self.flash_question_label.grid(row=0, column=0, sticky="w")
 
         self.flash_question_frame = ttk.Frame(self.flashcards_input_frame)
-        # Allow the question frame to expand in both directions
         self.flash_question_frame.grid(row=1, column=0, pady=5, sticky="nsew")
         self.flash_question_frame.columnconfigure(0, weight=1)
         self.flash_question_frame.rowconfigure(0, weight=1)
@@ -271,17 +274,12 @@ class QuizApp:
 
         self.flash_question_scrollbar = ttk.Scrollbar(self.flash_question_frame, orient="vertical", command=self.flash_question_text.yview)
         self.flash_question_text.config(yscrollcommand=self.flash_question_scrollbar.set)
-        # No immediate grid for scrollbar; it will appear as before when needed by toggle_scrollbars.
-        # If you rely on toggle_scrollbars, leave as is. If it doesn't show automatically, place it once:
-        # self.flash_question_scrollbar.grid(row=0, column=1, sticky="ns")
-        # and rely on toggle_scrollbars for visibility.
 
         # Flashcard Answer Entry Area
         self.flash_answer_label = ttk.Label(self.flashcards_input_frame, text="Enter Answer:")
         self.flash_answer_label.grid(row=2, column=0, sticky="w")
 
         self.flash_answer_frame = ttk.Frame(self.flashcards_input_frame)
-        # Allow the answer frame to also expand
         self.flash_answer_frame.grid(row=3, column=0, pady=5, sticky="nsew")
         self.flash_answer_frame.columnconfigure(0, weight=1)
         self.flash_answer_frame.rowconfigure(0, weight=1)
@@ -291,8 +289,6 @@ class QuizApp:
 
         self.flash_answer_scrollbar = ttk.Scrollbar(self.flash_answer_frame, orient="vertical", command=self.flash_answer_text.yview)
         self.flash_answer_text.config(yscrollcommand=self.flash_answer_scrollbar.set)
-        # If needed, grid the scrollbar once and rely on toggling:
-        # self.flash_answer_scrollbar.grid(row=0, column=1, sticky="ns")
 
         # Buttons to add and clear flashcard
         self.add_flash_button = ttk.Button(self.flashcards_input_frame, text="Add Flashcard", command=self.add_or_save_flashcard)
@@ -315,19 +311,17 @@ class QuizApp:
 
         self.flashcard_scrollbar = ttk.Scrollbar(self.flashcard_listbox_frame, orient="vertical", command=self.flashcard_listbox.yview)
         self.flashcard_listbox.config(yscrollcommand=self.flashcard_scrollbar.set)
+        self.flashcard_scrollbar.pack(side="right", fill="y")
 
         # Buttons for Flashcard Bank actions
         self.delete_flash_button = ttk.Button(self.flashcard_bank_frame, text="Delete Flashcard", command=self.delete_flashcard)
         self.delete_flash_button.grid(row=2, column=0, pady=5, sticky="w")
         self.save_flash_button = ttk.Button(self.flashcard_bank_frame, text="Save Deck", command=self.save_flashcard_bank)
         self.save_flash_button.grid(row=2, column=1, pady=5, sticky="e")
-        self.import_flash_button = ttk.Button(self.flashcard_bank_frame, text="Import Deck", command=self.import_flashcard_bank)
+        self.import_flash_button = ttk.Button(self.flashcard_bank_frame, text="Import Deck", command=self.import_flashcard_deck)
         self.import_flash_button.grid(row=3, column=0, pady=5, sticky="w")
         self.generate_deck_button = ttk.Button(self.flashcard_bank_frame, text="Generate Deck", command=self.generate_flashcard_deck)
         self.generate_deck_button.grid(row=3, column=1, columnspan=2, pady=5, sticky="e")
-
-
-
 
     # Flashcard Methods
     def add_flashcard(self):
@@ -358,85 +352,142 @@ class QuizApp:
         self.update_flashcard_bank()
 
     def save_flashcard_bank(self):
-        """Save the flashcard bank where questions and answers are separated by '=' and cards are separated by an empty line."""
+        """Save the flashcard bank in either TXT or CSV format."""
+        file_types = [
+            ("Text files", "*.txt"),
+            ("CSV files", "*.csv")
+        ]
         file_path = filedialog.asksaveasfilename(
             defaultextension=".txt",
-            filetypes=[("Flashcard files", "*.txt")],
+            filetypes=file_types
         )
         if not file_path:
-            return  # If no file is selected, exit the function
+            return
 
-        # Add '_flash' before the file extension if not already present
-        if not file_path.endswith("_flash.txt"):
-            file_path = file_path.replace(".txt", "_flash.txt")
+        if file_path.endswith('.csv'):
+            # Add '_flash' before the .csv extension if not already present
+            if not file_path.endswith("_flash.csv"):
+                file_path = file_path.replace(".csv", "_flash.csv")
+            self.save_flashcard_bank_csv(file_path)
+        else:
+            # Add '_flash' before the .txt extension if not already present
+            if not file_path.endswith("_flash.txt"):
+                file_path = file_path.replace(".txt", "_flash.txt")
+            self.save_flashcard_bank_txt(file_path)
 
+    def save_flashcard_bank_csv(self, file_path):
+        """Save flashcards in CSV format."""
         try:
-            with open(file_path, 'w', encoding='utf-8') as file:
+            with open(file_path, 'w', newline='', encoding='utf-8') as file:
+                writer = csv.writer(file)
+                writer.writerow(['Question', 'Answer'])  # Header row
                 for card in self.flashcards:
-                    question = card['question']
-                    answer = card['answer']
-                    file.write(f"{question}\n=\n{answer}\n\n")  # Use '=' to separate question and answer, and an empty line for each card
-
-                messagebox.showinfo("Save Successful", "Flashcards have been saved successfully.")
+                    writer.writerow([card['question'], card['answer']])
+            messagebox.showinfo("Save Successful", "Flashcards have been saved successfully.")
         except Exception as e:
             messagebox.showerror("Save Error", f"An error occurred while saving the flashcards:\n{e}")
 
+    def save_flashcard_bank_txt(self, file_path):
+        """Save flashcards in TXT format."""
+        try:
+            with open(file_path, 'w', encoding='utf-8') as file:
+                for card in self.flashcards:
+                    file.write(f"{card['question']}\n=\n{card['answer']}\n\n")
+            messagebox.showinfo("Save Successful", "Flashcards have been saved successfully.")
+        except Exception as e:
+            messagebox.showerror("Save Error", f"An error occurred while saving the flashcards:\n{e}")
 
+    def import_flashcard_bank(self, file_path, replace=True, popup=None):
+        """Import flashcards from either TXT or CSV format."""
+        try:
+            if replace:
+                self.flashcards.clear()
 
+            if file_path.endswith('.csv'):
+                self.import_flashcard_bank_csv(file_path)
+            else:
+                self.import_flashcard_bank_txt(file_path)
 
+            self.update_flashcard_bank()
+            if popup:
+                popup.destroy()
+            messagebox.showinfo("Import Successful", "Flashcards have been imported successfully.")
+        except Exception as e:
+            messagebox.showerror("Import Error", f"An error occurred while importing the flashcards:\n{e}")
 
+    def import_flashcard_bank_csv(self, file_path):
+        """Import flashcards from CSV format."""
+        with open(file_path, 'r', encoding='utf-8') as file:
+            reader = csv.reader(file)
+            next(reader)  # Skip header row
+            
+            for row in reader:
+                if len(row) >= 2:  # Must have both question and answer
+                    question = row[0].strip()
+                    answer = row[1].strip()
+                    if question and answer:
+                        self.flashcards.append({
+                            'question': question,
+                            'answer': answer
+                        })
 
-    def import_flashcard_bank(self):
-        """Import flashcards with the option to add or replace the current deck."""
-        file_path = filedialog.askopenfilename(filetypes=[("Flashcard files", "*.txt")])
-        if not file_path:
-            return  # Exit if no file is selected
+    def import_flashcard_bank_txt(self, file_path):
+        """Import flashcards from TXT format."""
+        with open(file_path, 'r', encoding='utf-8') as file:
+            content = file.read().strip()
+            raw_cards = content.split("\n\n")
+            
+            for raw_card in raw_cards:
+                parts = raw_card.split("\n=\n")
+                if len(parts) == 2:
+                    question = parts[0].strip()
+                    answer = parts[1].strip()
+                    if question and answer:
+                        self.flashcards.append({
+                            'question': question,
+                            'answer': answer
+                        })
 
-        def process_import(replace):
-            try:
-                with open(file_path, 'r', encoding='utf-8') as file:
-                    content = file.read().strip()
+    def import_flashcard_deck(self):
+        """Handle the import deck button click."""
+        file_types = [
+            ("Flashcard files", "*.txt"),
+            ("CSV files", "*.csv")
+        ]
+        file_path = filedialog.askopenfilename(filetypes=file_types)
+        if file_path:
+            if not self.flashcards:
+                # If no existing flashcards, directly import with replacement
+                self.import_flashcard_bank(file_path, replace=True)
+            else:
+                # If there are existing flashcards, show the popup
+                self.import_flashcard_popup(file_path)
 
-                # Split flashcards using a single empty line
-                raw_cards = content.split("\n\n")
+    def import_flashcard_popup(self, file_path):
+        """Show popup for importing flashcards with options to replace or add."""
+        popup = tk.Toplevel(self.root)
+        popup.title("Import Flashcard Deck")
+        popup.geometry("300x150")
 
-                if replace:
-                    self.flashcards.clear()  # Replace the current deck
+        label = ttk.Label(popup, text="What would you like to do?")
+        label.pack(pady=10)
 
-                for raw_card in raw_cards:
-                    lines = raw_card.strip().split("\n")
-                    if "=" in lines:
-                        delimiter_index = lines.index("=")
-                        question = "\n".join(lines[:delimiter_index]).strip()
-                        answer = "\n".join(lines[delimiter_index + 1:]).strip()
-                        if question and answer:
-                            self.flashcards.append({'question': question, 'answer': answer})
+        replace_button = ttk.Button(
+            popup, 
+            text="Replace Deck", 
+            command=lambda: self.import_flashcard_bank(file_path, replace=True, popup=popup)
+        )
+        replace_button.pack(pady=5)
 
-                self.update_flashcard_bank()
-                messagebox.showinfo("Import Successful", "Flashcards have been imported successfully.")
-            except Exception as e:
-                messagebox.showerror("Import Error", f"An error occurred while importing the flashcards:\n{e}")
+        add_button = ttk.Button(
+            popup, 
+            text="Add to Deck", 
+            command=lambda: self.import_flashcard_bank(file_path, replace=False, popup=popup)
+        )
+        add_button.pack(pady=5)
 
-        if self.flashcards:
-            # Prompt user to choose add or replace
-            popup = tk.Toplevel(self.root)
-            popup.title("Import Flashcards")
-            popup.geometry("300x150")
-
-            label = ttk.Label(popup, text="What would you like to do with the imported deck?")
-            label.pack(pady=10)
-
-            replace_button = ttk.Button(popup, text="Replace Deck", command=lambda: [process_import(True), popup.destroy()])
-            replace_button.pack(pady=5)
-
-            add_button = ttk.Button(popup, text="Add to Deck", command=lambda: [process_import(False), popup.destroy()])
-            add_button.pack(pady=5)
-
-            cancel_button = ttk.Button(popup, text="Cancel", command=popup.destroy)
-            cancel_button.pack(pady=5)
-        else:
-            # If no current deck, directly process the import
-            process_import(True)
+        cancel_button = ttk.Button(popup, text="Cancel", command=popup.destroy)
+        cancel_button.pack(pady=5)
 
 
 
@@ -467,18 +518,22 @@ class QuizApp:
         self.options_text.delete("1.0", tk.END)
         self.options_text.insert(tk.END, "\n".join(options_with_asterisks))
 
-        # Now manually trigger the scrollbar update
-        self.toggle_scrollbars(self.options_text, self.options_scrollbar, self.options_h_scrollbar)
-
         self.explanation_text.delete("1.0", tk.END)
         self.explanation_text.insert(tk.END, question_data["explanation"])
 
         # Keep track of the question being edited
         self.current_edit_index = index
+        
+        # Change Add button text and show Cancel button
         self.add_button.config(text="Save Changes")
-    
-        # Hide the "Clear" button while editing
-        self.clear_button.grid_remove()
+        self.clear_button.config(text="Cancel Edit", command=self.cancel_question_edit)
+        
+    def cancel_question_edit(self):
+        """Cancel editing and restore the original state."""
+        self.clear_fields()
+        self.clear_button.config(text="Clear", command=self.clear_fields)
+        self.current_edit_index = None
+        self.add_button.config(text="Add Question")
 
     def add_or_save_question(self):
         """
@@ -529,8 +584,10 @@ class QuizApp:
         self.options_text.delete("1.0", tk.END)  # Clear multiple choice options input
         self.explanation_text.delete("1.0", tk.END)  # Clear explanation input
 
-        self.add_button.config(text="Add Question")  # Reset the add button text
-        self.current_edit_index = None  # Reset the editing index
+        # Reset the buttons only if not in edit mode
+        if self.current_edit_index is None:
+            self.add_button.config(text="Add Question")
+            self.clear_button.config(text="Clear", command=self.clear_fields)
 
 
     def update_question_bank(self):
@@ -550,18 +607,53 @@ class QuizApp:
         self.update_question_bank()
 
     def save_question_bank(self):
-        """Save the question bank in the specified format."""
+        """Save the question bank in either TXT or CSV format."""
+        file_types = [
+            ("Text files", "*.txt"),
+            ("CSV files", "*.csv")
+        ]
         file_path = filedialog.asksaveasfilename(
             defaultextension=".txt",
-            filetypes=[("Quiz files", "*.txt")],
+            filetypes=file_types
         )
         if not file_path:
-            return  # If no file is selected, exit the function
+            return
 
-        # Add '_quiz' before the file extension if not already present
-        if not file_path.endswith("_quiz.txt"):
-            file_path = file_path.replace(".txt", "_quiz.txt")
+        # Determine file format based on extension
+        if file_path.endswith('.csv'):
+            # Add '_quiz' before the .csv extension if not already present
+            if not file_path.endswith("_quiz.csv"):
+                file_path = file_path.replace(".csv", "_quiz.csv")
+            self.save_question_bank_csv(file_path)
+        else:
+            # Add '_quiz' before the .txt extension if not already present
+            if not file_path.endswith("_quiz.txt"):
+                file_path = file_path.replace(".txt", "_quiz.txt")
+            self.save_question_bank_txt(file_path)
 
+    def save_question_bank_csv(self, file_path):
+        """Save question bank in CSV format."""
+        try:
+            with open(file_path, 'w', newline='', encoding='utf-8') as file:
+                writer = csv.writer(file)
+                writer.writerow(['Question', 'Options', 'Explanation'])  # Header row
+                
+                for question in self.questions:
+                    # Mark correct answers with asterisks
+                    options = [f"*{opt}" if opt in question['correct'] else opt 
+                             for opt in question['options']]
+                    options_str = '\n'.join(options)
+                    writer.writerow([
+                        question['question'],
+                        options_str,
+                        question.get('explanation', '')
+                    ])
+            messagebox.showinfo("Save Successful", "Quiz has been saved successfully.")
+        except Exception as e:
+            messagebox.showerror("Save Error", f"An error occurred while saving the quiz:\n{e}")
+
+    def save_question_bank_txt(self, file_path):
+        """Save question bank in TXT format."""
         try:
             with open(file_path, 'w', encoding='utf-8') as file:
                 for question_data in self.questions:
@@ -576,18 +668,18 @@ class QuizApp:
         except Exception as e:
             messagebox.showerror("Save Error", f"An error occurred while saving the quiz:\n{e}")
 
-
-
     def handle_import_button(self):
-        file_path = filedialog.askopenfilename(filetypes=[("Quiz files", "*.txt")])
+        """Handle importing quiz from either TXT or CSV format."""
+        file_types = [
+            ("Quiz files", "*.txt"),
+            ("CSV files", "*.csv")
+        ]
+        file_path = filedialog.askopenfilename(filetypes=file_types)
         if file_path:
             if not self.questions:
-                # Directly call the import method with replacement
                 self.import_question_bank(file_path, replace=True)
             else:
-                # Show the import options popup if there are existing questions
                 self.import_popup(file_path)
-
 
     def import_popup(self, file_path):
         popup = tk.Toplevel(self.root)
@@ -606,49 +698,16 @@ class QuizApp:
         cancel_button = ttk.Button(popup, text="Cancel", command=popup.destroy)
         cancel_button.pack(pady=5)
 
-    def import_question_bank(self, file_path, replace, popup=None):
-        """Import question bank from a file."""
+    def import_question_bank(self, file_path, replace=True, popup=None):
+        """Import question bank from either TXT or CSV format."""
         if replace:
             self.questions.clear()
 
         try:
-            with open(file_path, 'r', encoding='utf-8') as file:
-                content = file.read().strip()
-
-            # Split questions using a single empty line
-            raw_questions = content.split("\n\n")
-            for raw_question in raw_questions:
-                try:
-                    parts = raw_question.split("\n=\n")
-                    if len(parts) != 2:
-                        raise ValueError(f"Malformed question: {raw_question}")
-
-                    question, rest = parts
-                    options_and_explanation = rest.split("\n==\n")
-                    options_raw = options_and_explanation[0] if len(options_and_explanation) > 0 else ""
-                    explanation = options_and_explanation[1] if len(options_and_explanation) > 1 else "No explanation provided."
-
-                    # Process options, excluding `==`
-                    options = [opt.strip() for opt in options_raw.split("\n") if opt.strip() and opt != "=="]
-                    correct = [opt.lstrip("*").strip() for opt in options if opt.startswith("*")]
-                    all_options = [opt.lstrip("*").strip() for opt in options]
-
-                    if not question.strip() or not all_options:
-                        raise ValueError(f"Missing question or options: {raw_question}")
-
-                    self.questions.append(
-                        {
-                            "question": question.strip(),
-                            "options": all_options,
-                            "correct": correct,
-                            "explanation": explanation.strip(),
-                        }
-                    )
-                except Exception as e:
-                    print(f"Error importing question: {e}")  # Debug: Print specific error
-
-            # Debug: Print imported questions for verification
-            print("Imported Questions:", self.questions)  # Debug Statement
+            if file_path.endswith('.csv'):
+                self.import_question_bank_csv(file_path)
+            else:
+                self.import_question_bank_txt(file_path)
 
             self.update_question_bank()
             if popup:
@@ -657,7 +716,58 @@ class QuizApp:
         except Exception as e:
             messagebox.showerror("Import Error", f"An error occurred while importing the quiz:\n{e}")
 
+    def import_question_bank_csv(self, file_path):
+        """Import question bank from CSV format."""
+        with open(file_path, 'r', encoding='utf-8') as file:
+            reader = csv.reader(file)
+            next(reader)  # Skip header row
+            
+            for row in reader:
+                if len(row) >= 2:  # Must have at least question and options
+                    question = row[0].strip()
+                    options_raw = row[1].strip().split('\n')
+                    explanation = row[2].strip() if len(row) > 2 else "No explanation provided."
 
+                    # Process options
+                    options = [opt.strip() for opt in options_raw if opt.strip()]
+                    correct = [opt.lstrip('*').strip() for opt in options if opt.startswith('*')]
+                    all_options = [opt.lstrip('*').strip() for opt in options]
+
+                    if question and all_options:
+                        self.questions.append({
+                            "question": question,
+                            "options": all_options,
+                            "correct": correct,
+                            "explanation": explanation
+                        })
+
+    def import_question_bank_txt(self, file_path):
+        """Import question bank from TXT format."""
+        with open(file_path, 'r', encoding='utf-8') as file:
+            content = file.read().strip()
+            raw_questions = content.split("\n\n")
+            
+            for raw_question in raw_questions:
+                parts = raw_question.split("\n=\n")
+                if len(parts) != 2:
+                    continue
+
+                question, rest = parts
+                options_and_explanation = rest.split("\n==\n")
+                options_raw = options_and_explanation[0] if options_and_explanation else ""
+                explanation = options_and_explanation[1] if len(options_and_explanation) > 1 else "No explanation provided."
+
+                options = [opt.strip() for opt in options_raw.split("\n") if opt.strip()]
+                correct = [opt.lstrip("*").strip() for opt in options if opt.startswith("*")]
+                all_options = [opt.lstrip("*").strip() for opt in options]
+
+                if question.strip() and all_options:
+                    self.questions.append({
+                        "question": question.strip(),
+                        "options": all_options,
+                        "correct": correct,
+                        "explanation": explanation.strip()
+                    })
 
     def generate_quiz(self):
         """Generate a quiz with randomized question and multiple-choice options order."""
@@ -707,11 +817,17 @@ class QuizApp:
 
         # Keep track of the flashcard being edited
         self.current_edit_index = index
+        
+        # Change Add button text and show Cancel button
         self.add_flash_button.config(text="Save Changes")
+        self.clear_flash_button.config(text="Cancel Edit", command=self.cancel_flashcard_edit)
 
-        # Hide the "Clear" button while editing
-        self.clear_flash_button.grid_remove()
-
+    def cancel_flashcard_edit(self):
+        """Cancel editing and restore the original state."""
+        self.clear_flashcard_fields()
+        self.clear_flash_button.config(text="Clear", command=self.clear_flashcard_fields)
+        self.current_edit_index = None
+        self.add_flash_button.config(text="Add Flashcard")
 
     def add_or_save_flashcard(self):
         """Add a new flashcard or save changes to an existing one."""
@@ -754,7 +870,7 @@ class QuizApp:
         # Prompt user to choose starting side
         start_side = messagebox.askquestion(
             "Starting Side",
-            "Do you want to start with the questions? (Click 'Yes' for Questions, 'No' for Answers)",
+            "Do you want to start with the questions? (Click 'Yes' for Questions, 'No' for Answers)"
         )
 
         self.start_with_question = start_side == "yes"
@@ -762,11 +878,16 @@ class QuizApp:
         # Create the Flashcard Viewer Window
         self.deck_window = tk.Toplevel(self.root)
         self.deck_window.title("Flashcard Deck")
+        self.deck_window.geometry("800x600")  # Make the deck window larger
+
+        # Bind the resize event to dynamically adjust wrap length
+        self.deck_window.bind("<Configure>", self.on_deck_resize)
 
         self.current_flashcard_index = 0
 
-        self.flashcard_label = ttk.Label(self.deck_window, text="", wraplength=400, anchor="center", justify="center")
-        self.flashcard_label.pack(pady=20)
+        # Increase font size
+        self.flashcard_label = ttk.Label(self.deck_window, text="", font=("Helvetica", 24), anchor="center", justify="center")
+        self.flashcard_label.pack(pady=20, expand=True, fill="both")
 
         # Card Tracker
         self.card_tracker_label = ttk.Label(self.deck_window, text="")
@@ -785,6 +906,13 @@ class QuizApp:
         self.next_card_button.grid(row=0, column=1, padx=10)
 
         self.update_flashcard_view()
+
+
+    def on_deck_resize(self, event):
+        # Dynamically update wraplength as the window is resized
+        current_width = self.deck_window.winfo_width()
+        self.flashcard_label.configure(wraplength=current_width - 100)
+
 
     def update_flashcard_view(self):
         """Update the flashcard view and tracker based on the current index and side."""
@@ -841,80 +969,142 @@ class QuizRunner:
         self.quiz_questions = quiz_questions
         self.current_index = 0
         self.user_answers = [None] * len(self.quiz_questions)
+        self.flagged_questions = set()  # Track flagged questions
+        self.start_time = time.time()  # Add this line to fix the timer
 
-        # Set a static grid layout for the quiz window
-        self.root.columnconfigure(0, weight=1)
-        self.root.columnconfigure(1, weight=1)
-        self.root.columnconfigure(2, weight=1)
-        self.root.rowconfigure(0, weight=1)
-        self.root.rowconfigure(2, weight=1)
-        self.root.rowconfigure(3, weight=1)
+        # Set a minimum size for the quiz window
+        self.root.geometry("1000x600")
+        self.root.minsize(800, 500)
 
-        # Set a fixed size for the quiz window
-        self.root.geometry("800x400")
+        # Create main container frame
+        self.main_frame = ttk.Frame(self.root)
+        self.main_frame.pack(fill="both", expand=True, padx=10, pady=10)
         
-        # Create the question label without a fixed wraplength initially
-        self.question_label = ttk.Label(
-            self.root,
-            text="",
-            anchor="center",
-            justify="center",
-            font=("Helvetica", 18, "bold")
-        )
-        self.question_label.grid(row=1, column=0, columnspan=3, pady=10, sticky="ew")
+        # Create left frame for question tracker
+        self.tracker_frame = ttk.Frame(self.main_frame, width=200)  # Increased width
+        self.tracker_frame.pack(side="left", fill="both", padx=(0, 10))  # Changed to fill both
+        self.tracker_frame.pack_propagate(False)  # Prevent frame from shrinking
+        
+        # Create right frame for existing quiz content
+        self.quiz_frame = ttk.Frame(self.main_frame)
+        self.quiz_frame.pack(side="left", fill="both", expand=True)
 
-        # Bind the <Configure> event to dynamically update wraplength
-        self.root.bind("<Configure>", self.on_resize)
+        # Set up question tracker
+        self.setup_question_tracker()
+        
+        # Set up original quiz layout in quiz_frame
+        self.setup_quiz_content()
 
-        self.options_frame = ttk.Frame(self.root)
-        # Options in the center
-        self.options_frame.grid(row=2, column=0, columnspan=3, pady=10)
-
-        # To support multiple or single choice answers dynamically
-        self.option_vars = []  # Stores variables for Checkbuttons or Radiobuttons
-
-        self.navigation_frame = ttk.Frame(self.root)
-          # Navigation Buttons in the center
-        self.navigation_frame.grid(row=4, column=0, columnspan=3, pady=10)
-
-        self.prev_button = ttk.Button(self.navigation_frame, text="Previous", command=self.previous_question)
-        self.prev_button.grid(row=0, column=0, padx=10)
-
-        self.next_button = ttk.Button(self.navigation_frame, text="Next", command=self.next_question)
-        self.next_button.grid(row=0, column=1, padx=10)
-
-        self.submit_button = ttk.Button(self.root, text="Submit Quiz", command=self.submit_quiz)
-        # Submit Quiz Button - Bottom-Right Corner
-        self.submit_button.grid(row=3, column=2, padx=10, pady=10, sticky="se")
-
-    
         self.update_question()
-        
-
-
-        # Timer variables
-        self.start_time = time.time()  # Record the start time in seconds
-        self.timer_label = ttk.Label(self.root, text="Time Elapsed: 00:00", anchor="center", justify="center")
-        # Time Elapsed Timer - Top-Left Corner
-        self.timer_label.grid(row=0, column=0, padx=10, pady=10, sticky="nw")
-    
         self.update_timer()
 
-        # Progress tracker variables
-        self.progress_label = ttk.Label(self.root, text="")
-        # Progress Tracker - Bottom-Left Corner
-        self.progress_label.grid(row=3, column=0, padx=10, pady=10, sticky="sw")
-        
-        
-        self.update_progress()
+    def create_tooltip(self, widget, text):
+        """Create a tooltip for a widget."""
+        def enter(event):
+            x = widget.winfo_rootx() + widget.winfo_width()
+            y = widget.winfo_rooty()
+            
+            self.tooltip = tk.Toplevel(widget)
+            self.tooltip.wm_overrideredirect(True)
+            self.tooltip.wm_geometry(f"+{x}+{y}")
+            
+            label = ttk.Label(
+                self.tooltip, 
+                text=text, 
+                justify='left',
+                background="#ffffe0", 
+                relief='solid', 
+                borderwidth=1
+            )
+            label.pack()
+            
+        def leave(event):
+            if hasattr(self, 'tooltip'):
+                self.tooltip.destroy()
+                
+        widget.bind('<Enter>', enter)
+        widget.bind('<Leave>', leave)
 
-    def on_resize(self, event):
-        # Get the current width of the root window
-        current_width = self.root.winfo_width()
+    def setup_quiz_content(self):
+        """Set up the original quiz content."""
+        # Main content container with padding
+        content_container = ttk.Frame(self.quiz_frame)
+        content_container.pack(expand=True, fill="both")
+
+        # Timer at top right
+        self.timer_label = ttk.Label(content_container, text="Time Elapsed: 00:00")
+        self.timer_label.pack(anchor="ne", padx=20, pady=10)
+
+        # Center container for question and options
+        center_container = ttk.Frame(content_container)
+        center_container.pack(expand=True, fill="both", padx=50)  # Added horizontal padding
+
+        # Question
+        question_frame = ttk.Frame(center_container)
+        question_frame.pack(fill="x", pady=20)
         
-        # Set wraplength to slightly less than the current width to allow margins
-        # Adjust the subtraction as needed for desired margins
-        self.question_label.configure(wraplength=current_width - 100)
+        self.question_label = ttk.Label(
+            question_frame,
+            text="",
+            wraplength=600,
+            justify="left",
+            font=("Helvetica", 12, "bold")
+        )
+        self.question_label.pack(anchor="w")  # Align to left
+
+        # Options
+        self.options_frame = ttk.Frame(center_container)
+        self.options_frame.pack(fill="x", pady=20)
+
+        # Navigation buttons at bottom
+        nav_frame = ttk.Frame(content_container)
+        nav_frame.pack(fill="x", pady=20)
+        
+        # Center the Previous/Next buttons
+        nav_buttons = ttk.Frame(nav_frame)
+        nav_buttons.pack(expand=True)
+        
+        self.prev_button = ttk.Button(nav_buttons, text="Previous", command=self.previous_question)
+        self.prev_button.pack(side="left", padx=5)
+        
+        self.next_button = ttk.Button(nav_buttons, text="Next", command=self.next_question)
+        self.next_button.pack(side="left", padx=5)
+        
+        # Submit button in bottom right corner
+        self.submit_button = ttk.Button(content_container, text="Submit Quiz", command=self.submit_quiz)
+        self.submit_button.pack(side="bottom", anchor="se", padx=20, pady=10)
+
+    def update_question_status(self):
+        """Update the visual status of question tracker buttons."""
+        for i, btn in enumerate(self.tracker_buttons):
+            if i in self.flagged_questions:
+                btn.configure(style='Flagged.TButton')
+                tooltip_text = "Flagged for review"
+            elif self.user_answers[i] and self.user_answers[i] != "":  # Check if actually answered
+                btn.configure(style='Answered.TButton')
+                tooltip_text = "Answered"
+            else:
+                btn.configure(style='Unanswered.TButton')
+                tooltip_text = "Not answered yet"
+            
+            # Update tooltip
+            self.create_tooltip(btn, tooltip_text)
+
+    def toggle_flag(self):
+        """Toggle the flagged status of the current question."""
+        if self.current_index in self.flagged_questions:
+            self.flagged_questions.remove(self.current_index)
+            self.flag_button.configure(text="Flag Question")
+        else:
+            self.flagged_questions.add(self.current_index)
+            self.flag_button.configure(text="Unflag Question")
+        self.update_question_status()
+
+    def jump_to_question(self, index):
+        """Jump to a specific question when clicking its number."""
+        self.save_user_answers()
+        self.current_index = index
+        self.update_question()
 
     def update_question(self):
         current_question = self.quiz_questions[self.current_index]
@@ -953,17 +1143,24 @@ class QuizRunner:
         self.prev_button.config(state="normal" if self.current_index > 0 else "disabled")
         self.next_button.config(state="normal" if self.current_index < len(self.quiz_questions) - 1 else "disabled")
 
+        self.update_question_status()
+        # Update flag button text based on current question's status
+        if self.current_index in self.flagged_questions:
+            self.flag_button.configure(text="Unflag Question")
+        else:
+            self.flag_button.configure(text="Flag Question")
+
     def next_question(self):
         self.save_user_answers()
         self.current_index += 1
         self.update_question()
-        self.update_progress()
+        self.update_question_status()
 
     def previous_question(self):
         self.save_user_answers()
         self.current_index -= 1
         self.update_question()
-        self.update_progress()
+        self.update_question_status()
 
     def save_user_answers(self):
         current_question = self.quiz_questions[self.current_index]
@@ -977,160 +1174,172 @@ class QuizRunner:
             self.user_answers[self.current_index] = self.option_vars[0].get()
 
     def submit_quiz(self):
-        self.save_user_answers()  # Ensure the last question's answers are saved
-        self.stop_timer()  # Stop the timer
-        total_time = int(time.time() - self.start_time)  # Calculate total time taken
-
-        # Create a results window
-        result_window = tk.Toplevel(self.root)
-        result_window.title("Quiz Results")
-        result_window.geometry("1200x600")  # Fixed size for the results window
-
-        # Configure the results display area
-        canvas = tk.Canvas(result_window)
-        scrollbar = ttk.Scrollbar(result_window, orient="vertical", command=canvas.yview)
-        scrollable_frame = ttk.Frame(canvas)
-
-        scrollable_frame.bind(
-            "<Configure>",
-            lambda e: canvas.configure(scrollregion=canvas.bbox("all")),
-        )
-
-        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
-        canvas.configure(yscrollcommand=scrollbar.set)
-
-        canvas.pack(side="left", fill="both", expand=True)
-        scrollbar.pack(side="right", fill="y")
-
-        # Enable scrolling with the mouse wheel
-        def on_mouse_wheel(event):
-            canvas.yview_scroll(-1 * int((event.delta / 120)), "units")
-
-        canvas.bind_all("<MouseWheel>", on_mouse_wheel)  # For Windows and macOS
-        canvas.bind_all("<Button-4>", lambda event: canvas.yview_scroll(-1, "units"))  # For Linux (scroll up)
-        canvas.bind_all("<Button-5>", lambda event: canvas.yview_scroll(1, "units"))  # For Linux (scroll down)
-
-
-        # Define styling
-        heading_font = ("Helvetica", 11, "bold")  # Reduced size by 1
-        text_font = ("Helvetica", 10)
-        question_spacing = 15  # Space between questions
-
-        # Add results
-        score = 0
-        total = len(self.quiz_questions)
-        row_counter = 0
-
-        tk.Label(
-            scrollable_frame,
-            text="Quiz Results",
-            font=("Helvetica", 14, "bold"),
-            anchor="w",
-        ).grid(row=row_counter, column=0, columnspan=2, pady=(10, 20), sticky="w")
-        row_counter += 1
-
-        for idx, (question, user_answer) in enumerate(zip(self.quiz_questions, self.user_answers)):
-            correct_answers = ", ".join(question['correct'])
-            explanation = question.get('explanation', "No explanation provided.").strip()
-
-            # Question heading
-            tk.Label(
-                scrollable_frame,
-                text=f"Q{idx + 1}: {question['question']}",
-                font=heading_font,
-                anchor="w",
-                wraplength=1100,
-            ).grid(row=row_counter, column=0, columnspan=2, sticky="w", pady=(0, 5))
-            row_counter += 1
-
-            # User's answer
-            user_answer_display = (
-                ", ".join(user_answer) if isinstance(user_answer, list) else user_answer
-            )
-            tk.Label(
-                scrollable_frame, text="Your Answer:", font=heading_font, anchor="w"
-            ).grid(row=row_counter, column=0, sticky="w")
-            tk.Label(
-                scrollable_frame, text=f"{user_answer_display or 'No answer'}", font=text_font, anchor="w"
-            ).grid(row=row_counter, column=1, sticky="w")
-            row_counter += 1
-
-            # Correct answer(s)
-            tk.Label(
-                scrollable_frame, text="Correct Answer(s):", font=heading_font, anchor="w"
-            ).grid(row=row_counter, column=0, sticky="w")
-            tk.Label(
-                scrollable_frame, text=f"{correct_answers}", font=text_font, anchor="w"
-            ).grid(row=row_counter, column=1, sticky="w")
-            row_counter += 1
-
-            # Result
-            # Normalize user answers and correct answers for comparison
-            normalized_user_answer = set(
-                [ans.strip().lower() for ans in user_answer] if isinstance(user_answer, list) else [user_answer.strip().lower()]
-            )
-            normalized_correct_answer = set([ans.strip().lower() for ans in question['correct']])
-
-            if normalized_user_answer == normalized_correct_answer:
-                score += 1
-                result_text = "Correct"
-                result_color = "green"
-            else:
-                result_text = "Incorrect"
-                result_color = "red"
-
-
-            tk.Label(
-                scrollable_frame, text="Result:", font=heading_font, anchor="w"
-            ).grid(row=row_counter, column=0, sticky="w")
-            tk.Label(
-                scrollable_frame,
-                text=result_text,
-                font=(heading_font[0], heading_font[1], "bold"),
-                fg=result_color,  # Set text color
-                anchor="w",
-            ).grid(row=row_counter, column=1, sticky="w")
-            row_counter += 1
-
-
-            # Explanation
-            tk.Label(
-                scrollable_frame, text="Explanation:", font=heading_font, anchor="w"
-            ).grid(row=row_counter, column=0, sticky="nw")
-            tk.Label(
-                scrollable_frame,
-                text=f"{explanation}",
-                font=text_font,
-                wraplength=1100,
-                anchor="w",
-                justify="left",
-            ).grid(row=row_counter, column=1, sticky="w")
-            row_counter += 1
-
-            # Add spacing between questions
-            tk.Label(scrollable_frame, text="", font=text_font).grid(
-                row=row_counter, column=0, pady=question_spacing
-            )
-            row_counter += 1
-
-        # Final score and time
-        tk.Label(
-            scrollable_frame, text=f"Final Score: {score}/{total}", font=heading_font, anchor="w"
-        ).grid(row=row_counter, column=0, columnspan=2, pady=(20, 5), sticky="w")
-        row_counter += 1
-
+        """Submit the quiz and show results."""
+        self.save_user_answers()
+        self.stop_timer()
+        total_time = int(time.time() - self.start_time)
         minutes, seconds = divmod(total_time, 60)
-        tk.Label(
-            scrollable_frame,
-            text=f"Time Taken: {minutes:02d}:{seconds:02d}",
-            font=heading_font,
-            anchor="w",
-        ).grid(row=row_counter, column=0, columnspan=2, pady=(0, 10), sticky="w")
 
-        # Ensure quiz window closes when results window is closed
-        result_window.protocol(
-            "WM_DELETE_WINDOW", lambda: self.on_results_close(result_window)
-        )
+        # Store the initial window position
+        self.last_window_pos = None
+
+        def create_results_window(page=0):
+            # Calculate total questions first
+            total = len(self.quiz_questions)
+            QUESTIONS_PER_PAGE = 100
+            start_idx = page * QUESTIONS_PER_PAGE
+            end_idx = min(start_idx + QUESTIONS_PER_PAGE, total)
+            total_pages = (total - 1) // QUESTIONS_PER_PAGE + 1
+
+            # Calculate score (all in one line to avoid indentation issues)
+            score = sum(1 for q, a in zip(self.quiz_questions, self.user_answers) if (isinstance(a, list) and set(a) == set(q['correct'])) or (not isinstance(a, list) and a in q['correct']))
+
+            # Create results window
+            result_window = tk.Toplevel(self.root)
+            result_window.title(f"Quiz Results - Page {page + 1} of {total_pages}")
+            result_window.geometry("1200x800")
+
+            # If we have a stored position, use it
+            if self.last_window_pos:
+                result_window.geometry(f"+{self.last_window_pos[0]}+{self.last_window_pos[1]}")
+
+            # Create main container
+            main_container = ttk.Frame(result_window)
+            main_container.pack(fill="both", expand=True)
+
+            # Create stats frame at top
+            stats_frame = ttk.Frame(main_container)
+            stats_frame.pack(fill="x", padx=20, pady=10)
+
+            # Add title and stats
+            ttk.Label(
+                stats_frame,
+                text=f"Quiz Results Summary (Questions {start_idx + 1}-{end_idx} of {total})",
+                font=("Helvetica", 14, "bold")
+            ).pack(anchor="w", pady=(0, 10))
+
+            stats_info = ttk.Frame(stats_frame)
+            stats_info.pack(fill="x")
+
+            ttk.Label(
+                stats_info,
+                text=f"Final Score: {score}/{total} ({score/total*100:.1f}%)",
+                font=("Helvetica", 12, "bold")
+            ).pack(side="left", padx=20)
+
+            ttk.Label(
+                stats_info,
+                text=f"Time Taken: {minutes:02d}:{seconds:02d}",
+                font=("Helvetica", 12, "bold")
+            ).pack(side="left", padx=20)
+
+            ttk.Separator(main_container, orient="horizontal").pack(fill="x", pady=10)
+
+            # Create scrollable frame for questions
+            scroll_frame = ttk.Frame(main_container)
+            scroll_frame.pack(fill="both", expand=True, padx=20)
+
+            canvas = tk.Canvas(scroll_frame)
+            scrollbar = ttk.Scrollbar(scroll_frame, orient="vertical", command=canvas.yview)
+            results_frame = ttk.Frame(canvas)
+
+            # Display questions for current page
+            for idx in range(start_idx, end_idx):
+                q_frame = ttk.Frame(results_frame)
+                q_frame.pack(fill="x", pady=10)
+
+                question = self.quiz_questions[idx]
+                user_answer = self.user_answers[idx]
+
+                ttk.Label(
+                    q_frame,
+                    text=f"Q{idx + 1}: {question['question']}",
+                    font=("Helvetica", 11, "bold"),
+                    wraplength=1000
+                ).pack(anchor="w")
+
+                # User's answer
+                user_answer_display = ", ".join(user_answer) if isinstance(user_answer, list) else (user_answer or "No answer")
+                ttk.Label(q_frame, text="Your Answer:", font=("Helvetica", 11, "bold")).pack(anchor="w")
+                ttk.Label(q_frame, text=user_answer_display, font=("Helvetica", 10)).pack(anchor="w")
+
+                # Correct answer
+                correct_answers = ", ".join(question['correct'])
+                ttk.Label(q_frame, text="Correct Answer(s):", font=("Helvetica", 11, "bold")).pack(anchor="w")
+                ttk.Label(q_frame, text=correct_answers, font=("Helvetica", 10)).pack(anchor="w")
+
+                # Result
+                is_correct = (isinstance(user_answer, list) and set(user_answer) == set(question['correct'])) or \
+                           (not isinstance(user_answer, list) and user_answer in question['correct'])
+                
+                result_text = "Correct" if is_correct else "Incorrect"
+                result_color = "green" if is_correct else "red"
+
+                ttk.Label(q_frame, text="Result:", font=("Helvetica", 11, "bold")).pack(anchor="w")
+                tk.Label(
+                    q_frame,
+                    text=result_text,
+                    font=("Helvetica", 11, "bold"),
+                    fg=result_color
+                ).pack(anchor="w")
+
+                # Explanation
+                ttk.Label(q_frame, text="Explanation:", font=("Helvetica", 11, "bold")).pack(anchor="w")
+                ttk.Label(
+                    q_frame,
+                    text=question.get('explanation', 'No explanation provided.'),
+                    font=("Helvetica", 10),
+                    wraplength=1000
+                ).pack(anchor="w")
+
+                ttk.Separator(results_frame, orient="horizontal").pack(fill="x", pady=5)
+
+            # Configure scrolling
+            canvas.create_window((0, 0), window=results_frame, anchor="nw")
+            results_frame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+            canvas.bind_all("<MouseWheel>", lambda e: canvas.yview_scroll(-1 * (e.delta // 120), "units"))
+
+            # Pack scrollbar and canvas
+            scrollbar.pack(side="right", fill="y")
+            canvas.pack(side="left", fill="both", expand=True)
+            canvas.configure(yscrollcommand=scrollbar.set)
+
+            # Navigation buttons
+            nav_frame = ttk.Frame(main_container)
+            nav_frame.pack(fill="x", pady=10)
+
+            if page > 0:
+                ttk.Button(
+                    nav_frame,
+                    text="← Previous Page",
+                    command=lambda: [store_pos(), create_results_window(page - 1)]
+                ).pack(side="left", padx=20)
+
+            ttk.Label(
+                nav_frame,
+                text=f"Page {page + 1} of {total_pages}",
+                font=("Helvetica", 10)
+            ).pack(side="left", expand=True)
+
+            if end_idx < total:
+                ttk.Button(
+                    nav_frame,
+                    text="Next Page →",
+                    command=lambda: [store_pos(), create_results_window(page + 1)]
+                ).pack(side="right", padx=20)
+
+            def store_pos():
+                self.last_window_pos = (result_window.winfo_x(), result_window.winfo_y())
+                result_window.destroy()
+
+            def on_window_close():
+                self.last_window_pos = None
+                self.on_results_close(result_window)
+
+            result_window.protocol("WM_DELETE_WINDOW", on_window_close)
+
+        # Start with first page
+        create_results_window(0)
 
 
 
@@ -1153,6 +1362,89 @@ class QuizRunner:
     def update_progress(self):
         progress_text = f"Question {self.current_index + 1} of {len(self.quiz_questions)}"
         self.progress_label.config(text=progress_text)
+
+    def setup_question_tracker(self):
+        """Set up the question tracker panel with adaptive columns and scrolling."""
+        # Main container frame
+        main_container = ttk.Frame(self.tracker_frame)
+        main_container.pack(fill="both", expand=True)
+
+        # Title frame at top
+        title_frame = ttk.Frame(main_container)
+        title_frame.pack(fill="x", pady=(0, 5))
+        ttk.Label(title_frame, text="Questions:").pack(side="left", padx=5)
+
+        # Flag button frame at top (below title)
+        flag_frame = ttk.Frame(main_container)
+        flag_frame.pack(fill="x", pady=5)
+        self.flag_button = ttk.Button(
+            flag_frame,
+            text="Flag Question",
+            command=self.toggle_flag
+        )
+        self.flag_button.pack()
+
+        # Scrollable frame for question buttons
+        scroll_container = ttk.Frame(main_container)
+        scroll_container.pack(fill="both", expand=True)
+
+        # Create canvas and scrollbar
+        canvas = tk.Canvas(scroll_container)
+        scrollbar = ttk.Scrollbar(scroll_container, orient="vertical", command=canvas.yview)
+        
+        # Create container for buttons
+        self.tracker_buttons_frame = ttk.Frame(canvas)
+        
+        # Determine optimal number of columns
+        total_questions = len(self.quiz_questions)
+        if total_questions <= 95:
+            questions_per_row = 5
+        elif total_questions <= 114:
+            questions_per_row = 6
+        elif total_questions <= 133:
+            questions_per_row = 7
+        else:
+            questions_per_row = 8
+
+        # Calculate and set frame width
+        button_width = 35
+        frame_width = button_width * questions_per_row + 20
+        self.tracker_frame.configure(width=frame_width)
+        
+        # Create question number buttons
+        self.tracker_buttons = []
+        for i in range(total_questions):
+            row = i // questions_per_row
+            col = i % questions_per_row
+            
+            btn = ttk.Button(
+                self.tracker_buttons_frame,
+                text=str(i + 1),
+                width=3,
+                command=lambda x=i: self.jump_to_question(x)
+            )
+            btn.grid(row=row, column=col, padx=2, pady=2)
+            self.tracker_buttons.append(btn)
+            self.create_tooltip(btn, "Not answered yet")
+
+        # Configure canvas with scrolling
+        canvas.create_window((0, 0), window=self.tracker_buttons_frame, anchor="nw")
+        
+        def configure_scroll_region(event):
+            canvas.configure(scrollregion=canvas.bbox("all"))
+            
+        def on_mouse_wheel(event):
+            canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+            
+        self.tracker_buttons_frame.bind("<Configure>", configure_scroll_region)
+        canvas.bind_all("<MouseWheel>", on_mouse_wheel)
+        
+        # Pack scrollbar and canvas
+        scrollbar.pack(side="right", fill="y")
+        canvas.pack(side="left", fill="both", expand=True)
+
+        # Configure canvas scrolling
+        canvas.configure(yscrollcommand=scrollbar.set)
 
 
 
