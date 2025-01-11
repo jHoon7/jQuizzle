@@ -1,6 +1,10 @@
 import sys
 import csv
 import io
+from tkinter import *
+from PIL import Image, ImageTk
+import base64
+from io import BytesIO
 
 def hide_console_window():
     if sys.platform == "win32":
@@ -19,7 +23,7 @@ def hide_console_window():
 if __name__ == "__main__":
     hide_console_window()
     # Rest of your application logic
-
+    
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 import random
@@ -66,6 +70,21 @@ class QuizApp:
         style.configure('Unanswered.TButton', background='gray')
         style.configure('Answered.TButton', background='green')
         style.configure('Flagged.TButton', background='yellow')
+
+        # Embedded icon (base64 string of your .png file)
+        icon_base64 = """
+        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
+        """
+        
+        # Convert base64 to PhotoImage
+        icon_data = base64.b64decode(icon_base64)
+        icon_image = Image.open(BytesIO(icon_data))
+        icon = ImageTk.PhotoImage(icon_image)
+        
+        self.root.iconphoto(True, icon)
+        
+        # OR Method 2: Using .ico file
+        # self.root.iconbitmap('path/to/your/icon.ico')
 
     def focus_next_widget(self, event):
         """Move focus to the next widget."""
@@ -787,15 +806,19 @@ class QuizApp:
         self.root.withdraw()
         self.quiz_window = tk.Toplevel(self.root)
         self.quiz_window.title("Quiz Time")
-        self.quiz_window.protocol("WM_DELETE_WINDOW", self.on_quiz_close)  # Link to on_quiz_close
-        QuizRunner(self.quiz_window, quiz_questions)
-
+        self.quiz_window.protocol("WM_DELETE_WINDOW", self.on_quiz_close)
+        
+        # Create QuizRunner instance
+        quiz_runner = QuizRunner(self.quiz_window, quiz_questions)
 
     def on_quiz_close(self):
         """Handle the event when the quiz window is closed."""
         if hasattr(self, 'quiz_window') and self.quiz_window:
             self.quiz_window.destroy()  # Destroy the quiz window
         self.root.deiconify()  # Show the main application window
+
+
+
 
 
     def edit_flashcard_on_double_click(self, event):
@@ -864,55 +887,17 @@ class QuizApp:
             messagebox.showwarning("No Flashcards", "There are no flashcards in the Flashcard Bank.")
             return
 
-        # Shuffle the flashcards
-        random.shuffle(self.flashcards)
-
-        # Prompt user to choose starting side
-        start_side = messagebox.askquestion(
-            "Starting Side",
-            "Do you want to start with the questions? (Click 'Yes' for Questions, 'No' for Answers)"
-        )
-
-        self.start_with_question = start_side == "yes"
-
         # Create the Flashcard Viewer Window
         self.deck_window = tk.Toplevel(self.root)
         self.deck_window.title("Flashcard Deck")
-        self.deck_window.geometry("800x600")  # Make the deck window larger
+        self.deck_window.geometry("800x600")
 
-        # Bind the resize event to dynamically adjust wrap length
-        self.deck_window.bind("<Configure>", self.on_deck_resize)
-
-        self.current_flashcard_index = 0
-
-        # Increase font size
-        self.flashcard_label = ttk.Label(self.deck_window, text="", font=("Helvetica", 24), anchor="center", justify="center")
-        self.flashcard_label.pack(pady=20, expand=True, fill="both")
-
-        # Card Tracker
-        self.card_tracker_label = ttk.Label(self.deck_window, text="")
-        self.card_tracker_label.pack(pady=10)
-
-        self.flip_button = ttk.Button(self.deck_window, text="Flip", command=self.flip_flashcard)
-        self.flip_button.pack(pady=10)
-
-        self.deck_navigation_frame = ttk.Frame(self.deck_window)
-        self.deck_navigation_frame.pack(pady=10)
-
-        self.prev_card_button = ttk.Button(self.deck_navigation_frame, text="Previous", command=self.previous_flashcard)
-        self.prev_card_button.grid(row=0, column=0, padx=10)
-
-        self.next_card_button = ttk.Button(self.deck_navigation_frame, text="Next", command=self.next_flashcard)
-        self.next_card_button.grid(row=0, column=1, padx=10)
-
-        self.update_flashcard_view()
-
+        # Rest of your flashcard setup code...
 
     def on_deck_resize(self, event):
         # Dynamically update wraplength as the window is resized
         current_width = self.deck_window.winfo_width()
         self.flashcard_label.configure(wraplength=current_width - 100)
-
 
     def update_flashcard_view(self):
         """Update the flashcard view and tracker based on the current index and side."""
@@ -931,7 +916,6 @@ class QuizApp:
         self.card_tracker_label.config(
             text=f"Card {self.current_flashcard_index + 1} of {len(self.flashcards)}"
         )
-
 
     def flip_flashcard(self):
         """Flip the flashcard to the other side."""
@@ -959,6 +943,7 @@ class QuizApp:
         if self.current_flashcard_index < 0:
             self.current_flashcard_index = len(self.flashcards) - 1  # Loop back to the last flashcard
         self.update_flashcard_view()
+
 
 
 
