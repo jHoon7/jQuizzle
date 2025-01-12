@@ -1048,8 +1048,8 @@ class QuizRunner:
         self.start_time = time.time()  # Add this line to fix the timer
 
         # Set a minimum size for the quiz window
-        self.root.geometry("1000x600")
-        self.root.minsize(800, 500)
+        self.root.geometry("1020x620")  # Increased from 1000x600
+        self.root.minsize(820, 520)  # Increased from 800x500
 
         # Create main container frame
         self.main_frame = ttk.Frame(self.root)
@@ -1078,7 +1078,7 @@ class QuizRunner:
         style.configure('Unanswered.TButton', background='gray')
         style.configure('Answered.TButton', background='blue')
         style.configure('Flagged.TButton', background='yellow')
-        style.configure('FlaggedAndAnswered.TButton', background='#B19CD9')  # Light purple
+        style.configure('FlaggedAndAnswered.TButton', background='#8B6BB2')  # Darker purple
         style.configure('Correct.TButton', background='green')
         style.configure('Incorrect.TButton', background='red')
 
@@ -1132,7 +1132,7 @@ class QuizRunner:
             text="",
             wraplength=600,
             justify="left",
-            font=("Helvetica", 16, "bold")  # Increased from 14 to 16
+            font=("Helvetica", 14, "bold")  # Reduced from 16 to 14
         )
         self.question_label.pack(anchor="w")
 
@@ -1238,57 +1238,98 @@ class QuizRunner:
 
     def update_question(self):
         current_question = self.quiz_questions[self.current_index]
-        self.question_label.config(text=f"Q{self.current_index + 1}: {current_question['question']}")
+        
+        # Adjust font size if quiz is submitted
+        question_font_size = 12 if hasattr(self, 'quiz_submitted') else 14
+        self.question_label.config(
+            text=f"Q{self.current_index + 1}: {current_question['question']}", 
+            font=("Helvetica", question_font_size, "bold")
+        )
 
         # Clear the options frame
         for widget in self.options_frame.winfo_children():
             widget.destroy()
 
-        # Create options with larger font
-        self.option_vars = []
+        # Create options with proper wrapping
+        self.option_vars = []  # Initialize option_vars list
+        option_font_size = 10 if hasattr(self, 'quiz_submitted') else 11
+        
         if len(current_question['correct']) > 1:
-            # Multiple choice logic...
+            # Multiple choice logic with wrapped text
             for option in current_question['options']:
                 var = tk.BooleanVar(value=False)
-                var.trace_add('write', lambda *args: self.update_question_status())  # Add immediate update
+                var.trace_add('write', lambda *args: self.update_question_status())
+                
+                option_frame = ttk.Frame(self.options_frame)
+                option_frame.pack(fill="x", anchor="w", padx=10, pady=4)
+                
                 cb = ttk.Checkbutton(
-                    self.options_frame, 
-                    text=option, 
+                    option_frame, 
                     variable=var,
                     style='Large.TCheckbutton'
                 )
-                cb.pack(anchor="w", padx=10, pady=4)
-                self.option_vars.append((option, var))
+                cb.pack(side="left", anchor="nw")
+                
+                label = ttk.Label(
+                    option_frame,
+                    text=option,
+                    wraplength=600,
+                    justify="left",
+                    font=('Helvetica', option_font_size)
+                )
+                label.pack(side="left", fill="x", padx=(5, 0))
+                
+                # Store both checkbox and label for disabling
+                self.option_vars.append((option, var, cb, label))
         else:
-            # Single choice logic...
+            # Single choice logic with wrapped text
             var = tk.StringVar(value="")
-            var.trace_add('write', lambda *args: self.update_question_status())  # Add immediate update
+            var.trace_add('write', lambda *args: self.update_question_status())
+            self.option_vars.append(var)  # Add the StringVar to option_vars first
+            
+            self.radio_widgets = []  # Store radio buttons and labels
             for option in current_question['options']:
+                option_frame = ttk.Frame(self.options_frame)
+                option_frame.pack(fill="x", anchor="w", padx=10, pady=4)
+                
                 rb = ttk.Radiobutton(
-                    self.options_frame, 
-                    text=option, 
-                    variable=var, 
+                    option_frame,
+                    variable=var,
                     value=option,
                     style='Large.TRadiobutton'
                 )
-                rb.pack(anchor="w", padx=10, pady=4)
-            self.option_vars.append(var)
+                rb.pack(side="left", anchor="nw")
+                
+                label = ttk.Label(
+                    option_frame,
+                    text=option,
+                    wraplength=600,
+                    justify="left",
+                    font=('Helvetica', option_font_size)
+                )
+                label.pack(side="left", fill="x", padx=(5, 0))
+                
+                self.radio_widgets.append((rb, label))
 
         # Restore user's previous answer
         if len(current_question['correct']) > 1:
-            for option, var in self.option_vars:
+            for option, var, _, _ in self.option_vars:
                 if self.user_answers[self.current_index] and option in self.user_answers[self.current_index]:
                     var.set(True)
         else:
             if self.user_answers[self.current_index]:
                 self.option_vars[0].set(self.user_answers[self.current_index])
 
-        # If quiz is submitted, show answer details
+        # If quiz is submitted, disable and gray out options
         if hasattr(self, 'quiz_submitted'):
-            # Disable all options
-            for widget in self.options_frame.winfo_children():
-                if isinstance(widget, (ttk.Checkbutton, ttk.Radiobutton)):
-                    widget.configure(state='disabled')
+            if len(current_question['correct']) > 1:
+                for _, _, cb, label in self.option_vars:
+                    cb.configure(state='disabled')
+                    label.configure(foreground='gray')
+            else:
+                for rb, label in self.radio_widgets:
+                    rb.configure(state='disabled')
+                    label.configure(foreground='gray')
 
             # Add separator
             ttk.Separator(self.options_frame, orient='horizontal').pack(fill='x', pady=20)
@@ -1298,9 +1339,9 @@ class QuizRunner:
             details_container.pack(fill='both', expand=True)
 
             # Create canvas and scrollbar
-            details_canvas = tk.Canvas(details_container, height=200)
+            details_canvas = tk.Canvas(details_container, height=250)  # Reduced from 300 to 250
             details_scrollbar = ttk.Scrollbar(details_container, orient='vertical', command=details_canvas.yview)
-            
+
             # Create frame for content
             details_frame = ttk.Frame(details_canvas)
             
@@ -1496,8 +1537,39 @@ class QuizRunner:
         # Disable submit button and options
         self.submit_button.config(state="disabled")
         
+        # Resize window to show all content
+        self.root.update_idletasks()  # Let the window process all changes
+        required_height = self.root.winfo_reqheight() + 100  # Increased padding from 50 to 100
+        current_width = self.root.winfo_width()
+        
+        # Get screen height
+        screen_height = self.root.winfo_screenheight()
+        
+        # Limit height to 90% of screen height if needed
+        if required_height > screen_height * 0.9:
+            required_height = int(screen_height * 0.9)
+        
+        # Set minimum height to ensure buttons are visible
+        min_height = 800  # Minimum height to ensure visibility of all elements
+        required_height = max(required_height, min_height)
+        
+        self.root.geometry(f"{current_width}x{required_height}")
+        
+        # Force an update to ensure proper layout
+        self.root.update()
+        
         # Update current question display to show results
         self.update_question()
+
+        # Remove the submit button completely
+        self.submit_button.destroy()
+
+        # Reduce the size of navigation buttons after grading
+        style = ttk.Style()
+        style.configure('GradedNav.TButton', padding=(10, 5), font=('Helvetica', 10))  # Smaller style for graded navigation
+        
+        self.prev_button.configure(style='GradedNav.TButton')
+        self.next_button.configure(style='GradedNav.TButton')
 
     def stop_timer(self):
         """Stop the timer and store end time."""
