@@ -68,9 +68,19 @@ class QuizApp:
         # Create custom styles for question tracker buttons
         style = ttk.Style()
         style.configure('Unanswered.TButton', background='gray')
-        style.configure('Answered.TButton', background='green')
+        style.configure('Answered.TButton', background='blue')
         style.configure('Flagged.TButton', background='yellow')
-
+        style.configure('FlaggedAndAnswered.TButton', background='#E6E6FA')  # Light purple
+        style.configure('Correct.TButton', background='green')
+        style.configure('Incorrect.TButton', background='red')
+        
+        # Create a style for flagged+answered with blue background and yellow border
+        style.configure('FlaggedAnswered.TButton', 
+                       background='blue',      # Inner color (answered)
+                       bordercolor='yellow',   # Outer color (flagged)
+                       borderwidth=3,          # Make border visible
+                       relief='solid')         # Solid border style
+        
         # Embedded icon (base64 string of your .png file)
         icon_base64 = """
         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
@@ -891,8 +901,88 @@ class QuizApp:
         self.deck_window = tk.Toplevel(self.root)
         self.deck_window.title("Flashcard Deck")
         self.deck_window.geometry("800x600")
+        self.deck_window.minsize(600, 400)
 
-        # Rest of your flashcard setup code...
+        # Initialize variables
+        self.current_flashcard_index = 0
+        self.current_side = "question"
+        self.start_with_question = True  # Toggle to control which side shows first
+
+        # Create main container with padding
+        main_container = ttk.Frame(self.deck_window, padding="20")
+        main_container.pack(fill="both", expand=True)
+
+        # Card display area (centered)
+        card_frame = ttk.Frame(main_container)
+        card_frame.pack(fill="both", expand=True)
+
+        # Flashcard content
+        self.flashcard_label = ttk.Label(
+            card_frame,
+            text="",
+            wraplength=600,
+            justify="center",
+            font=("Helvetica", 14)
+        )
+        self.flashcard_label.pack(expand=True)
+
+        # Navigation buttons - moved up and centered
+        button_frame = ttk.Frame(main_container)
+        button_frame.pack(fill="x", pady=(0, 20))  # Changed from pady=(20, 0)
+
+        # Center container for buttons
+        center_button_frame = ttk.Frame(button_frame)
+        center_button_frame.pack(expand=True)
+
+        # Style for larger buttons
+        button_style = ttk.Style()
+        button_style.configure('Large.TButton', padding=(20, 10))  # Increased padding
+
+        # Previous button
+        prev_button = ttk.Button(
+            center_button_frame,
+            text="← Previous",
+            command=self.previous_flashcard,
+            style='Large.TButton'
+        )
+        prev_button.pack(side="left", padx=10)  # Increased padding between buttons
+
+        # Flip button
+        flip_button = ttk.Button(
+            center_button_frame,
+            text="Flip Card",
+            command=self.flip_flashcard,
+            style='Large.TButton'
+        )
+        flip_button.pack(side="left", padx=10)
+
+        # Next button
+        next_button = ttk.Button(
+            center_button_frame,
+            text="Next →",
+            command=self.next_flashcard,
+            style='Large.TButton'
+        )
+        next_button.pack(side="left", padx=10)
+
+        # Card tracker
+        self.card_tracker_label = ttk.Label(
+            main_container,
+            text=f"Card 1 of {len(self.flashcards)}",
+            font=("Helvetica", 10)
+        )
+        self.card_tracker_label.pack(pady=(10, 0))
+
+        # Bind resize event
+        self.deck_window.bind('<Configure>', self.on_deck_resize)
+
+        # Show first flashcard
+        self.update_flashcard_view()
+
+        # Key bindings for navigation
+        self.deck_window.bind('<Left>', lambda e: self.previous_flashcard())
+        self.deck_window.bind('<Right>', lambda e: self.next_flashcard())
+        self.deck_window.bind('<space>', lambda e: self.flip_flashcard())
 
     def on_deck_resize(self, event):
         # Dynamically update wraplength as the window is resized
@@ -983,6 +1073,15 @@ class QuizRunner:
         self.update_question()
         self.update_timer()
 
+        # Create custom styles for question tracker buttons
+        style = ttk.Style()
+        style.configure('Unanswered.TButton', background='gray')
+        style.configure('Answered.TButton', background='blue')
+        style.configure('Flagged.TButton', background='yellow')
+        style.configure('FlaggedAndAnswered.TButton', background='#B19CD9')  # Light purple
+        style.configure('Correct.TButton', background='green')
+        style.configure('Incorrect.TButton', background='red')
+
     def create_tooltip(self, widget, text):
         """Create a tooltip for a widget."""
         def enter(event):
@@ -1013,19 +1112,19 @@ class QuizRunner:
     def setup_quiz_content(self):
         """Set up the original quiz content."""
         # Main content container with padding
-        content_container = ttk.Frame(self.quiz_frame)
-        content_container.pack(expand=True, fill="both")
+        self.content_container = ttk.Frame(self.quiz_frame)  # Store reference
+        self.content_container.pack(expand=True, fill="both")
 
         # Timer at top right
-        self.timer_label = ttk.Label(content_container, text="Time Elapsed: 00:00")
+        self.timer_label = ttk.Label(self.content_container, text="Time Elapsed: 00:00")
         self.timer_label.pack(anchor="ne", padx=20, pady=10)
 
         # Center container for question and options
-        center_container = ttk.Frame(content_container)
-        center_container.pack(expand=True, fill="both", padx=50)  # Added horizontal padding
+        self.center_container = ttk.Frame(self.content_container)  # Store reference
+        self.center_container.pack(expand=True, fill="both", padx=50)
 
         # Question
-        question_frame = ttk.Frame(center_container)
+        question_frame = ttk.Frame(self.center_container)
         question_frame.pack(fill="x", pady=20)
         
         self.question_label = ttk.Label(
@@ -1033,46 +1132,76 @@ class QuizRunner:
             text="",
             wraplength=600,
             justify="left",
-            font=("Helvetica", 12, "bold")
+            font=("Helvetica", 16, "bold")  # Increased from 14 to 16
         )
-        self.question_label.pack(anchor="w")  # Align to left
+        self.question_label.pack(anchor="w")
 
         # Options
-        self.options_frame = ttk.Frame(center_container)
+        self.options_frame = ttk.Frame(self.center_container)
         self.options_frame.pack(fill="x", pady=20)
 
+        # Create custom styles for larger buttons and options
+        style = ttk.Style()
+        style.configure('Large.TButton', padding=(20, 10), font=('Helvetica', 11))  # Larger navigation buttons
+        style.configure('Large.TCheckbutton', font=('Helvetica', 12))  # Larger checkbuttons
+        style.configure('Large.TRadiobutton', font=('Helvetica', 12))  # Larger radiobuttons
+
         # Navigation buttons at bottom
-        nav_frame = ttk.Frame(content_container)
+        nav_frame = ttk.Frame(self.content_container)
         nav_frame.pack(fill="x", pady=20)
         
         # Center the Previous/Next buttons
         nav_buttons = ttk.Frame(nav_frame)
         nav_buttons.pack(expand=True)
         
-        self.prev_button = ttk.Button(nav_buttons, text="Previous", command=self.previous_question)
-        self.prev_button.pack(side="left", padx=5)
+        self.prev_button = ttk.Button(
+            nav_buttons, 
+            text="← Previous", 
+            command=self.previous_question,
+            style='Large.TButton'  # Apply large button style
+        )
+        self.prev_button.pack(side="left", padx=10)  # Increased padding
         
-        self.next_button = ttk.Button(nav_buttons, text="Next", command=self.next_question)
-        self.next_button.pack(side="left", padx=5)
+        self.next_button = ttk.Button(
+            nav_buttons, 
+            text="Next →", 
+            command=self.next_question,
+            style='Large.TButton'  # Apply large button style
+        )
+        self.next_button.pack(side="left", padx=10)  # Increased padding
         
         # Submit button in bottom right corner
-        self.submit_button = ttk.Button(content_container, text="Submit Quiz", command=self.submit_quiz)
+        self.submit_button = ttk.Button(
+            self.content_container, 
+            text="Submit Quiz", 
+            command=self.submit_quiz,
+            style='Large.TButton'  # Apply large button style
+        )
         self.submit_button.pack(side="bottom", anchor="se", padx=20, pady=10)
 
     def update_question_status(self):
         """Update the visual status of question tracker buttons."""
         for i, btn in enumerate(self.tracker_buttons):
-            if i in self.flagged_questions:
-                btn.configure(style='Flagged.TButton')
+            if hasattr(self, 'quiz_submitted'):
+                # After submission, colors are already set to green/red
+                return
+                
+            is_flagged = i in self.flagged_questions
+            is_answered = self.user_answers[i] and self.user_answers[i] != ""
+
+            if is_flagged and is_answered:
+                btn.configure(style='FlaggedAndAnswered.TButton')  # Light purple
+                tooltip_text = "Flagged and Answered"
+            elif is_flagged:
+                btn.configure(style='Flagged.TButton')  # Yellow background
                 tooltip_text = "Flagged for review"
-            elif self.user_answers[i] and self.user_answers[i] != "":  # Check if actually answered
-                btn.configure(style='Answered.TButton')
+            elif is_answered:
+                btn.configure(style='Answered.TButton')  # Blue background
                 tooltip_text = "Answered"
             else:
-                btn.configure(style='Unanswered.TButton')
+                btn.configure(style='Unanswered.TButton')  # Gray background
                 tooltip_text = "Not answered yet"
             
-            # Update tooltip
             self.create_tooltip(btn, tooltip_text)
 
     def toggle_flag(self):
@@ -1083,13 +1212,29 @@ class QuizRunner:
         else:
             self.flagged_questions.add(self.current_index)
             self.flag_button.configure(text="Unflag Question")
+        
+        # Update button text based on current question's status
+        self.update_flag_button_text()
         self.update_question_status()
+
+    def update_flag_button_text(self):
+        """Update flag button text based on current question's status."""
+        if hasattr(self, 'quiz_submitted'):
+            return  # Don't update flag button if quiz is submitted
+            
+        if self.current_index in self.flagged_questions:
+            self.flag_button.configure(text="Unflag Question")
+        else:
+            self.flag_button.configure(text="Flag Question")
 
     def jump_to_question(self, index):
         """Jump to a specific question when clicking its number."""
         self.save_user_answers()
+        self.update_question_status()
         self.current_index = index
         self.update_question()
+        if not hasattr(self, 'quiz_submitted'):  # Only update flag button if quiz isn't submitted
+            self.update_flag_button_text()
 
     def update_question(self):
         current_question = self.quiz_questions[self.current_index]
@@ -1099,21 +1244,34 @@ class QuizRunner:
         for widget in self.options_frame.winfo_children():
             widget.destroy()
 
-        # Dynamically create options (Radiobuttons or Checkbuttons based on the question)
+        # Create options with larger font
         self.option_vars = []
         if len(current_question['correct']) > 1:
-            # Use Checkbuttons for multiple correct answers
+            # Multiple choice logic...
             for option in current_question['options']:
                 var = tk.BooleanVar(value=False)
-                cb = ttk.Checkbutton(self.options_frame, text=option, variable=var)
-                cb.pack(anchor="w", padx=10, pady=2)
+                var.trace_add('write', lambda *args: self.update_question_status())  # Add immediate update
+                cb = ttk.Checkbutton(
+                    self.options_frame, 
+                    text=option, 
+                    variable=var,
+                    style='Large.TCheckbutton'
+                )
+                cb.pack(anchor="w", padx=10, pady=4)
                 self.option_vars.append((option, var))
         else:
-            # Use Radiobuttons for single correct answer
+            # Single choice logic...
             var = tk.StringVar(value="")
+            var.trace_add('write', lambda *args: self.update_question_status())  # Add immediate update
             for option in current_question['options']:
-                rb = ttk.Radiobutton(self.options_frame, text=option, variable=var, value=option)
-                rb.pack(anchor="w", padx=10, pady=2)
+                rb = ttk.Radiobutton(
+                    self.options_frame, 
+                    text=option, 
+                    variable=var, 
+                    value=option,
+                    style='Large.TRadiobutton'
+                )
+                rb.pack(anchor="w", padx=10, pady=4)
             self.option_vars.append(var)
 
         # Restore user's previous answer
@@ -1125,27 +1283,137 @@ class QuizRunner:
             if self.user_answers[self.current_index]:
                 self.option_vars[0].set(self.user_answers[self.current_index])
 
+        # If quiz is submitted, show answer details
+        if hasattr(self, 'quiz_submitted'):
+            # Disable all options
+            for widget in self.options_frame.winfo_children():
+                if isinstance(widget, (ttk.Checkbutton, ttk.Radiobutton)):
+                    widget.configure(state='disabled')
+
+            # Add separator
+            ttk.Separator(self.options_frame, orient='horizontal').pack(fill='x', pady=20)
+
+            # Create scrollable frame for answer details
+            details_container = ttk.Frame(self.options_frame)
+            details_container.pack(fill='both', expand=True)
+
+            # Create canvas and scrollbar
+            details_canvas = tk.Canvas(details_container, height=200)
+            details_scrollbar = ttk.Scrollbar(details_container, orient='vertical', command=details_canvas.yview)
+            
+            # Create frame for content
+            details_frame = ttk.Frame(details_canvas)
+            
+            # Configure scrolling
+            details_canvas.configure(yscrollcommand=details_scrollbar.set)
+            details_canvas.pack(side='left', fill='both', expand=True)
+            details_scrollbar.pack(side='right', fill='y')
+            
+            # Create window in canvas with fixed width
+            canvas_width = self.options_frame.winfo_width() - 50
+            if canvas_width <= 0:
+                canvas_width = 500
+            
+            details_canvas.create_window((0, 0), window=details_frame, anchor='nw', width=canvas_width)
+
+            # Show user's answer with correctness indicator
+            user_answer = self.user_answers[self.current_index]
+            user_answer_display = ", ".join(user_answer) if isinstance(user_answer, list) else (user_answer or "No answer")
+            
+            answer_header_frame = ttk.Frame(details_frame)
+            answer_header_frame.pack(anchor="w", fill='x', pady=(0, 5))
+            
+            ttk.Label(
+                answer_header_frame, 
+                text="Your Answer:", 
+                font=("Helvetica", 11, "bold")
+            ).pack(side="left")
+
+            # Check if answer is correct
+            is_correct = (isinstance(user_answer, list) and set(user_answer) == set(current_question['correct'])) or \
+                        (not isinstance(user_answer, list) and user_answer in current_question['correct'])
+            
+            # Add Correct/Incorrect indicator
+            tk.Label(
+                answer_header_frame,
+                text=" (Correct)" if is_correct else " (Incorrect)",
+                font=("Helvetica", 11, "bold"),
+                fg="green" if is_correct else "red"
+            ).pack(side="left")
+            
+            ttk.Label(
+                details_frame, 
+                text=user_answer_display,
+                font=("Helvetica", 10)
+            ).pack(anchor="w", pady=(0, 10))
+
+            # Show correct answer
+            correct_answers = ", ".join(current_question['correct'])
+            ttk.Label(
+                details_frame, 
+                text="Correct Answer(s):", 
+                font=("Helvetica", 11, "bold")
+            ).pack(anchor="w", pady=(0, 5))
+            
+            ttk.Label(
+                details_frame, 
+                text=correct_answers,
+                font=("Helvetica", 10)
+            ).pack(anchor="w", pady=(0, 10))
+
+            # Show explanation
+            ttk.Label(
+                details_frame, 
+                text="Explanation:", 
+                font=("Helvetica", 11, "bold")
+            ).pack(anchor="w", pady=(0, 5))
+            
+            ttk.Label(
+                details_frame, 
+                text=current_question.get('explanation', 'No explanation provided.'),
+                font=("Helvetica", 10),
+                wraplength=500,  # Slightly smaller than canvas width
+                justify="left"
+            ).pack(anchor="w", pady=(0, 10))
+
+            # Update scroll region when content changes
+            def configure_scroll_region(event):
+                details_canvas.configure(scrollregion=details_canvas.bbox("all"))
+            details_frame.bind("<Configure>", configure_scroll_region)
+
+            # Enable mousewheel scrolling
+            def on_mousewheel(event):
+                details_canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+            details_canvas.bind_all("<MouseWheel>", on_mousewheel)
+
+            # Unbind mousewheel when mouse leaves the canvas
+            def unbind_mousewheel(event):
+                details_canvas.unbind_all("<MouseWheel>")
+            def bind_mousewheel(event):
+                details_canvas.bind_all("<MouseWheel>", on_mousewheel)
+                
+            details_canvas.bind('<Enter>', bind_mousewheel)
+            details_canvas.bind('<Leave>', unbind_mousewheel)
+
+        # Update navigation buttons
         self.prev_button.config(state="normal" if self.current_index > 0 else "disabled")
         self.next_button.config(state="normal" if self.current_index < len(self.quiz_questions) - 1 else "disabled")
-
-        self.update_question_status()
-        # Update flag button text based on current question's status
-        if self.current_index in self.flagged_questions:
-            self.flag_button.configure(text="Unflag Question")
-        else:
-            self.flag_button.configure(text="Flag Question")
 
     def next_question(self):
         self.save_user_answers()
         self.current_index += 1
         self.update_question()
         self.update_question_status()
+        if not hasattr(self, 'quiz_submitted'):  # Only update flag button if quiz isn't submitted
+            self.update_flag_button_text()
 
     def previous_question(self):
         self.save_user_answers()
         self.current_index -= 1
         self.update_question()
         self.update_question_status()
+        if not hasattr(self, 'quiz_submitted'):  # Only update flag button if quiz isn't submitted
+            self.update_flag_button_text()
 
     def save_user_answers(self):
         current_question = self.quiz_questions[self.current_index]
@@ -1157,209 +1425,109 @@ class QuizRunner:
         else:
             # Save selected option for single correct answer
             self.user_answers[self.current_index] = self.option_vars[0].get()
+        
+        self.update_question_status()  # Update status immediately after saving
 
     def submit_quiz(self):
-        """Submit the quiz and show results."""
+        """Submit the quiz and show results in the current window."""
         self.save_user_answers()
-        self.stop_timer()
-        total_time = int(time.time() - self.start_time)
+        self.stop_timer()  # Stop the timer
+        self.quiz_submitted = True
+        
+        # Calculate score and time
+        total_time = int(self.end_time - self.start_time)
         minutes, seconds = divmod(total_time, 60)
+        total = len(self.quiz_questions)
+        score = sum(1 for q, a in zip(self.quiz_questions, self.user_answers) 
+                   if (isinstance(a, list) and set(a) == set(q['correct'])) 
+                   or (not isinstance(a, list) and a in q['correct']))
 
-        # Store the initial window position
-        self.last_window_pos = None
+        # Update tracker buttons to show correct/incorrect
+        for i, (question, answer) in enumerate(zip(self.quiz_questions, self.user_answers)):
+            is_correct = (isinstance(answer, list) and set(answer) == set(question['correct'])) or \
+                        (not isinstance(answer, list) and answer in question['correct'])
 
-        def create_results_window(page=0):
-            # Calculate total questions first
-            total = len(self.quiz_questions)
-            QUESTIONS_PER_PAGE = 100
-            start_idx = page * QUESTIONS_PER_PAGE
-            end_idx = min(start_idx + QUESTIONS_PER_PAGE, total)
-            total_pages = (total - 1) // QUESTIONS_PER_PAGE + 1
+            if is_correct:
+                self.tracker_buttons[i].configure(style='Correct.TButton')
+                self.create_tooltip(self.tracker_buttons[i], "Correct")
+            else:
+                self.tracker_buttons[i].configure(style='Incorrect.TButton')
+                self.create_tooltip(self.tracker_buttons[i], "Incorrect")
 
-            # Calculate score (all in one line to avoid indentation issues)
-            score = sum(1 for q, a in zip(self.quiz_questions, self.user_answers) if (isinstance(a, list) and set(a) == set(q['correct'])) or (not isinstance(a, list) and a in q['correct']))
+        # Create and add results summary frame at the top
+        self.results_frame = ttk.Frame(self.quiz_frame)
+        self.results_frame.pack(before=self.center_container, fill="x", padx=20, pady=10)
+        
+        results_title = ttk.Label(
+            self.results_frame,
+            text="Quiz Results Summary",
+            font=("Helvetica", 14, "bold")
+        )
+        results_title.pack(anchor="w", pady=(0, 10))
 
-            # Create results window
-            result_window = tk.Toplevel(self.root)
-            result_window.title(f"Quiz Results - Page {page + 1} of {total_pages}")
-            result_window.geometry("1200x800")
+        score_label = ttk.Label(
+            self.results_frame,
+            text=f"Final Score: {score}/{total} ({score/total*100:.1f}%)",
+            font=("Helvetica", 12, "bold")
+        )
+        score_label.pack(side="left", padx=20)
 
-            # If we have a stored position, use it
-            if self.last_window_pos:
-                result_window.geometry(f"+{self.last_window_pos[0]}+{self.last_window_pos[1]}")
+        time_label = ttk.Label(
+            self.results_frame,
+            text=f"Time Taken: {minutes:02d}:{seconds:02d}",
+            font=("Helvetica", 12, "bold")
+        )
+        time_label.pack(side="left", padx=20)
 
-            # Create main container
-            main_container = ttk.Frame(result_window)
-            main_container.pack(fill="both", expand=True)
+        # Update timer display to be blank after submission
+        self.timer_label.config(text="")
+        
+        # Remove the flag button and add Questions label
+        self.flag_button.destroy()
+        
+        # Add Questions label
+        self.questions_label = ttk.Label(
+            self.title_frame,
+            text="Questions:",
+            font=("Helvetica", 11, "bold")
+        )
+        self.questions_label.pack(side="left", padx=5)
 
-            # Create stats frame at top
-            stats_frame = ttk.Frame(main_container)
-            stats_frame.pack(fill="x", padx=20, pady=10)
-
-            # Add title and stats
-            ttk.Label(
-                stats_frame,
-                text=f"Quiz Results Summary (Questions {start_idx + 1}-{end_idx} of {total})",
-                font=("Helvetica", 14, "bold")
-            ).pack(anchor="w", pady=(0, 10))
-
-            stats_info = ttk.Frame(stats_frame)
-            stats_info.pack(fill="x")
-
-            ttk.Label(
-                stats_info,
-                text=f"Final Score: {score}/{total} ({score/total*100:.1f}%)",
-                font=("Helvetica", 12, "bold")
-            ).pack(side="left", padx=20)
-
-            ttk.Label(
-                stats_info,
-                text=f"Time Taken: {minutes:02d}:{seconds:02d}",
-                font=("Helvetica", 12, "bold")
-            ).pack(side="left", padx=20)
-
-            ttk.Separator(main_container, orient="horizontal").pack(fill="x", pady=10)
-
-            # Create scrollable frame for questions
-            scroll_frame = ttk.Frame(main_container)
-            scroll_frame.pack(fill="both", expand=True, padx=20)
-
-            canvas = tk.Canvas(scroll_frame)
-            scrollbar = ttk.Scrollbar(scroll_frame, orient="vertical", command=canvas.yview)
-            results_frame = ttk.Frame(canvas)
-
-            # Display questions for current page
-            for idx in range(start_idx, end_idx):
-                q_frame = ttk.Frame(results_frame)
-                q_frame.pack(fill="x", pady=10)
-
-                question = self.quiz_questions[idx]
-                user_answer = self.user_answers[idx]
-
-                ttk.Label(
-                    q_frame,
-                    text=f"Q{idx + 1}: {question['question']}",
-                    font=("Helvetica", 11, "bold"),
-                    wraplength=1000
-                ).pack(anchor="w")
-
-                # User's answer
-                user_answer_display = ", ".join(user_answer) if isinstance(user_answer, list) else (user_answer or "No answer")
-                ttk.Label(q_frame, text="Your Answer:", font=("Helvetica", 11, "bold")).pack(anchor="w")
-                ttk.Label(q_frame, text=user_answer_display, font=("Helvetica", 10)).pack(anchor="w")
-
-                # Correct answer
-                correct_answers = ", ".join(question['correct'])
-                ttk.Label(q_frame, text="Correct Answer(s):", font=("Helvetica", 11, "bold")).pack(anchor="w")
-                ttk.Label(q_frame, text=correct_answers, font=("Helvetica", 10)).pack(anchor="w")
-
-                # Result
-                is_correct = (isinstance(user_answer, list) and set(user_answer) == set(question['correct'])) or \
-                           (not isinstance(user_answer, list) and user_answer in question['correct'])
-                
-                result_text = "Correct" if is_correct else "Incorrect"
-                result_color = "green" if is_correct else "red"
-
-                ttk.Label(q_frame, text="Result:", font=("Helvetica", 11, "bold")).pack(anchor="w")
-                tk.Label(
-                    q_frame,
-                    text=result_text,
-                    font=("Helvetica", 11, "bold"),
-                    fg=result_color
-                ).pack(anchor="w")
-
-                # Explanation
-                ttk.Label(q_frame, text="Explanation:", font=("Helvetica", 11, "bold")).pack(anchor="w")
-                ttk.Label(
-                    q_frame,
-                    text=question.get('explanation', 'No explanation provided.'),
-                    font=("Helvetica", 10),
-                    wraplength=1000
-                ).pack(anchor="w")
-
-                ttk.Separator(results_frame, orient="horizontal").pack(fill="x", pady=5)
-
-            # Configure scrolling
-            canvas.create_window((0, 0), window=results_frame, anchor="nw")
-            results_frame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
-            canvas.bind_all("<MouseWheel>", lambda e: canvas.yview_scroll(-1 * (e.delta // 120), "units"))
-
-            # Pack scrollbar and canvas
-            scrollbar.pack(side="right", fill="y")
-            canvas.pack(side="left", fill="both", expand=True)
-            canvas.configure(yscrollcommand=scrollbar.set)
-
-            # Navigation buttons
-            nav_frame = ttk.Frame(main_container)
-            nav_frame.pack(fill="x", pady=10)
-
-            if page > 0:
-                ttk.Button(
-                    nav_frame,
-                    text="← Previous Page",
-                    command=lambda: [store_pos(), create_results_window(page - 1)]
-                ).pack(side="left", padx=20)
-
-            ttk.Label(
-                nav_frame,
-                text=f"Page {page + 1} of {total_pages}",
-                font=("Helvetica", 10)
-            ).pack(side="left", expand=True)
-
-            if end_idx < total:
-                ttk.Button(
-                    nav_frame,
-                    text="Next Page →",
-                    command=lambda: [store_pos(), create_results_window(page + 1)]
-                ).pack(side="right", padx=20)
-
-            def store_pos():
-                self.last_window_pos = (result_window.winfo_x(), result_window.winfo_y())
-                result_window.destroy()
-
-            def on_window_close():
-                self.last_window_pos = None
-                self.on_results_close(result_window)
-
-            result_window.protocol("WM_DELETE_WINDOW", on_window_close)
-
-        # Start with first page
-        create_results_window(0)
-
-
-
-
-
-    def on_results_close(self, result_window):
-        result_window.destroy()
-        self.root.destroy()  # Close the quiz window
-        app.root.deiconify()  # Show the main application window
-
-    def update_timer(self):
-        elapsed_seconds = int(time.time() - self.start_time)  # Calculate elapsed time
-        minutes, seconds = divmod(elapsed_seconds, 60)
-        self.timer_label.config(text=f"Time Elapsed: {minutes:02d}:{seconds:02d}")
-        self.root.after(1000, self.update_timer)  # Schedule the next update
+        # Disable submit button and options
+        self.submit_button.config(state="disabled")
+        
+        # Update current question display to show results
+        self.update_question()
 
     def stop_timer(self):
-        self.end_time = time.time()  # Record the end time if needed
+        """Stop the timer and store end time."""
+        self.end_time = time.time()
+        self.root.after_cancel(self.timer_id)  # Cancel the timer update
+
+    def update_timer(self):
+        """Update the timer display."""
+        if hasattr(self, 'quiz_submitted'):
+            return  # Don't update if quiz is submitted
+        
+        elapsed_seconds = int(time.time() - self.start_time)
+        minutes, seconds = divmod(elapsed_seconds, 60)
+        self.timer_label.config(text=f"Time Elapsed: {minutes:02d}:{seconds:02d}")
+        self.timer_id = self.root.after(1000, self.update_timer)  # Store timer id for cancellation
 
     def update_progress(self):
         progress_text = f"Question {self.current_index + 1} of {len(self.quiz_questions)}"
         self.progress_label.config(text=progress_text)
 
     def setup_question_tracker(self):
-        """Set up the question tracker panel with adaptive columns and scrolling."""
         # Main container frame
         main_container = ttk.Frame(self.tracker_frame)
         main_container.pack(fill="both", expand=True)
 
-        # Title frame at top
-        title_frame = ttk.Frame(main_container)
-        title_frame.pack(fill="x", pady=(0, 5))
-        ttk.Label(title_frame, text="Questions:").pack(side="left", padx=5)
+        # Title frame at top (but don't add Questions label yet)
+        self.title_frame = ttk.Frame(main_container)  # Store reference to add label later
+        self.title_frame.pack(fill="x", pady=(0, 5))
 
-        # Flag button frame at top (below title)
+        # Flag button frame at top
         flag_frame = ttk.Frame(main_container)
         flag_frame.pack(fill="x", pady=5)
         self.flag_button = ttk.Button(
@@ -1430,6 +1598,7 @@ class QuizRunner:
 
         # Configure canvas scrolling
         canvas.configure(yscrollcommand=scrollbar.set)
+
 
 
 
