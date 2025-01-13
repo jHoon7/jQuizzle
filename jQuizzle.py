@@ -5,6 +5,8 @@ from tkinter import *
 from PIL import Image, ImageTk
 import base64
 from io import BytesIO
+import os
+from datetime import datetime
 
 def hide_console_window():
     if sys.platform == "win32":
@@ -1571,6 +1573,15 @@ class QuizRunner:
         self.prev_button.configure(style='GradedNav.TButton')
         self.next_button.configure(style='GradedNav.TButton')
 
+        # After adding the time_label, add the export button
+        export_button = ttk.Button(
+            self.results_frame,
+            text="Export Results",
+            command=self.handle_export,
+            style='Large.TButton'
+        )
+        export_button.pack(side="left", padx=20)
+
     def stop_timer(self):
         """Stop the timer and store end time."""
         self.end_time = time.time()
@@ -1670,6 +1681,83 @@ class QuizRunner:
 
         # Configure canvas scrolling
         canvas.configure(yscrollcommand=scrollbar.set)
+
+    def export_quiz_results(self):
+        """Export quiz results to a text file including all answers and explanations."""
+        try:
+            # Calculate score
+            total = len(self.quiz_questions)
+            score = sum(1 for q, a in zip(self.quiz_questions, self.user_answers) 
+                       if (isinstance(a, list) and set(a) == set(q['correct'])) 
+                       or (not isinstance(a, list) and a in q['correct']))
+            
+            # Generate timestamp for filename
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"quiz_results_{timestamp}.txt"
+            
+            with open(filename, 'w', encoding='utf-8') as f:
+                # Write header
+                f.write("Quiz Results Summary\n")
+                f.write("=" * 50 + "\n\n")
+                
+                # Write score and time
+                total_time = int(self.end_time - self.start_time)
+                minutes, seconds = divmod(total_time, 60)
+                f.write(f"Final Score: {score}/{total} ({score/total*100:.1f}%)\n")
+                f.write(f"Time Taken: {minutes:02d}:{seconds:02d}\n\n")
+                
+                # Write detailed results for each question
+                f.write("Detailed Question Analysis\n")
+                f.write("=" * 50 + "\n\n")
+                
+                for i, (question, answer) in enumerate(zip(self.quiz_questions, self.user_answers), 1):
+                    f.write(f"Question {i}:\n")
+                    f.write(f"{question['question']}\n\n")
+                    
+                    # Write user's answer
+                    if isinstance(answer, list):
+                        user_ans = ", ".join(answer) if answer else "No answer provided"
+                    else:
+                        user_ans = answer if answer else "No answer provided"
+                    f.write(f"Your Answer: {user_ans}\n")
+                    
+                    # Write correct answer
+                    correct_ans = ", ".join(question['correct'])
+                    f.write(f"Correct Answer: {correct_ans}\n")
+                    
+                    # Check if answer is correct
+                    is_correct = (isinstance(answer, list) and set(answer) == set(question['correct'])) or \
+                                (not isinstance(answer, list) and answer in question['correct'])
+                    f.write(f"Status: {'Correct' if is_correct else 'Incorrect'}\n")
+                    
+                    # Write explanation
+                    f.write(f"Explanation: {question.get('explanation', 'No explanation provided.')}\n")
+                    f.write("\n" + "-" * 50 + "\n\n")
+                
+                return filename
+                
+        except Exception as e:
+            messagebox.showerror("Export Error", f"Failed to export results: {str(e)}")
+            return None
+
+    def handle_export(self):
+        """Handle the export button click."""
+        filename = self.export_quiz_results()
+        if filename:
+            if messagebox.askyesno(
+                "Export Successful", 
+                f"Quiz results have been exported to:\n{filename}\n\nWould you like to view the results?"
+            ):
+                try:
+                    # Open the file with the default text editor
+                    import os
+                    if os.name == 'nt':  # Windows
+                        os.startfile(filename)
+                    else:  # macOS and Linux
+                        import subprocess
+                        subprocess.run(['xdg-open' if os.name == 'posix' else 'open', filename])
+                except Exception as e:
+                    messagebox.showerror("Error", f"Could not open the file: {str(e)}")
 
 
 
