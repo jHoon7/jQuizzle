@@ -3183,7 +3183,7 @@ def format_question(question_data):
     random.shuffle(options)
     
     # Format the output
-    formatted_text = f"{question_text}\n\n"
+    formatted_text = f"Gum Guess of the Day!\n\n{question_text}\n\n"
     
     # Keep track of which emoji was used for the correct answer
     correct_answer_emoji = None
