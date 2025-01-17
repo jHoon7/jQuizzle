@@ -899,16 +899,20 @@ class QuizApp:
             messagebox.showwarning("No Flashcards", "There are no flashcards in the Flashcard Bank.")
             return
 
+        # Create shuffled copy of flashcards
+        shuffled_deck = random.sample(self.flashcards, len(self.flashcards))
+
         # Create the Flashcard Viewer Window
         self.deck_window = tk.Toplevel(self.root)
         self.deck_window.title("Flashcard Deck")
         self.deck_window.geometry("800x600")
         self.deck_window.minsize(600, 400)
 
-        # Initialize variables
+        # Initialize variables with shuffled deck
         self.current_flashcard_index = 0
         self.current_side = "question"
-        self.start_with_question = True  # Toggle to control which side shows first
+        self.start_with_question = True
+        self.current_deck = shuffled_deck  # Store the shuffled deck
 
         # Create main container with padding
         main_container = ttk.Frame(self.deck_window, padding="20")
@@ -993,10 +997,10 @@ class QuizApp:
 
     def update_flashcard_view(self):
         """Update the flashcard view and tracker based on the current index and side."""
-        if self.current_flashcard_index < 0 or self.current_flashcard_index >= len(self.flashcards):
+        if self.current_flashcard_index < 0 or self.current_flashcard_index >= len(self.current_deck):
             return
 
-        flashcard = self.flashcards[self.current_flashcard_index]
+        flashcard = self.current_deck[self.current_flashcard_index]
         if self.start_with_question:
             self.flashcard_label.config(text=flashcard["question"])
             self.current_side = "question"
@@ -1006,15 +1010,15 @@ class QuizApp:
 
         # Update card tracker
         self.card_tracker_label.config(
-            text=f"Card {self.current_flashcard_index + 1} of {len(self.flashcards)}"
-        )
+            text=f"Card {self.current_flashcard_index + 1} of {len(self.current_deck)}"
+        )  # Added closing parenthesis here
 
     def flip_flashcard(self):
         """Flip the flashcard to the other side."""
-        if self.current_flashcard_index < 0 or self.current_flashcard_index >= len(self.flashcards):
+        if self.current_flashcard_index < 0 or self.current_flashcard_index >= len(self.current_deck):
             return
 
-        flashcard = self.flashcards[self.current_flashcard_index]
+        flashcard = self.current_deck[self.current_flashcard_index]
         if self.current_side == "question":
             self.flashcard_label.config(text=flashcard["answer"])
             self.current_side = "answer"
@@ -1025,7 +1029,7 @@ class QuizApp:
     def next_flashcard(self):
         """Navigate to the next flashcard in the deck."""
         self.current_flashcard_index += 1
-        if self.current_flashcard_index >= len(self.flashcards):
+        if self.current_flashcard_index >= len(self.current_deck):
             self.current_flashcard_index = 0  # Loop back to the first flashcard
         self.update_flashcard_view()
 
@@ -1033,7 +1037,7 @@ class QuizApp:
         """Navigate to the previous flashcard in the deck."""
         self.current_flashcard_index -= 1
         if self.current_flashcard_index < 0:
-            self.current_flashcard_index = len(self.flashcards) - 1  # Loop back to the last flashcard
+            self.current_flashcard_index = len(self.current_deck) - 1  # Loop back to the last flashcard
         self.update_flashcard_view()
 
 
