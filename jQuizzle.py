@@ -7,6 +7,10 @@ import base64
 from io import BytesIO
 import os
 from datetime import datetime
+import tkinter as tk
+from tkinter import ttk, messagebox, filedialog
+import random
+import time  # Add this import at the top of the file
 
 def hide_console_window():
     if sys.platform == "win32":
@@ -25,12 +29,6 @@ def hide_console_window():
 if __name__ == "__main__":
     hide_console_window()
     # Rest of your application logic
-    
-import tkinter as tk
-from tkinter import ttk, messagebox, filedialog
-import random
-import time  # Add this import at the top of the file
-
 
 class QuizApp:
     def __init__(self, root):
