@@ -29,7 +29,7 @@ def hide_console_window():
 if __name__ == "__main__":
     hide_console_window()
     # Rest of your application logic
-
+   
 class QuizApp:
     def __init__(self, root):
         self.root = root
@@ -1118,14 +1118,47 @@ class QuizRunner:
         # Main content container with padding
         self.content_container = ttk.Frame(self.quiz_frame)  # Store reference
         self.content_container.pack(expand=True, fill="both")
+        
+        # Configure content container to allow proper expansion
+        self.content_container.columnconfigure(0, weight=1)
+        self.content_container.rowconfigure(0, weight=0)  # Timer row - fixed height
+        self.content_container.rowconfigure(1, weight=1)  # Question content - expandable
+        self.content_container.rowconfigure(2, weight=0)  # Navigation buttons - fixed height
 
         # Timer at top right
         self.timer_label = ttk.Label(self.content_container, text="Time Elapsed: 00:00")
-        self.timer_label.pack(anchor="ne", padx=20, pady=10)
+        self.timer_label.grid(row=0, column=0, sticky="ne", padx=20, pady=10)
 
-        # Center container for question and options
-        self.center_container = ttk.Frame(self.content_container)  # Store reference
-        self.center_container.pack(expand=True, fill="both", padx=50)
+        # Create scrollable frame for question content
+        self.scroll_frame = ttk.Frame(self.content_container)
+        self.scroll_frame.grid(row=1, column=0, sticky="nsew", padx=20, pady=10)
+        
+        # Make the scroll_frame expandable
+        self.scroll_frame.columnconfigure(0, weight=1)
+        self.scroll_frame.rowconfigure(0, weight=1)
+        
+        # Create canvas for scrolling
+        self.content_canvas = tk.Canvas(self.scroll_frame, borderwidth=0, highlightthickness=0)
+        self.content_scrollbar = ttk.Scrollbar(self.scroll_frame, orient="vertical", command=self.content_canvas.yview)
+        
+        # Center container for question and options (placed inside canvas)
+        self.center_container = ttk.Frame(self.content_canvas)
+        
+        # Configure scrolling
+        self.content_canvas.configure(yscrollcommand=self.content_scrollbar.set)
+        self.content_canvas_window = self.content_canvas.create_window(
+            (0, 0), window=self.center_container, anchor="nw", tags="self.center_container"
+        )
+        
+        # Place canvas and scrollbar in scroll_frame
+        self.content_canvas.grid(row=0, column=0, sticky="nsew")
+        # Initially hide scrollbar - will appear only when needed
+        self.content_scrollbar.grid(row=0, column=1, sticky="ns")
+        self.content_scrollbar.grid_remove()  # Hide until needed
+        
+        # Make canvas expandable
+        self.scroll_frame.columnconfigure(0, weight=1)
+        self.scroll_frame.rowconfigure(0, weight=1)
 
         # Question
         question_frame = ttk.Frame(self.center_container)
@@ -1150,12 +1183,12 @@ class QuizRunner:
         style.configure('Large.TCheckbutton', font=('Helvetica', 12))  # Larger checkbuttons
         style.configure('Large.TRadiobutton', font=('Helvetica', 12))  # Larger radiobuttons
 
-        # Navigation buttons at bottom
-        nav_frame = ttk.Frame(self.content_container)
-        nav_frame.pack(fill="x", pady=20)
+        # Navigation buttons in a fixed position at bottom - this is the key change
+        self.nav_frame = ttk.Frame(self.content_container)
+        self.nav_frame.grid(row=2, column=0, sticky="ew", pady=10)
         
         # Center the Previous/Next buttons
-        nav_buttons = ttk.Frame(nav_frame)
+        nav_buttons = ttk.Frame(self.nav_frame)
         nav_buttons.pack(expand=True)
         
         self.prev_button = ttk.Button(
@@ -1174,14 +1207,83 @@ class QuizRunner:
         )
         self.next_button.pack(side="left", padx=10)  # Increased padding
         
-        # Submit button in bottom right corner
+        # Submit button at fixed position in bottom right
         self.submit_button = ttk.Button(
             self.content_container, 
             text="Submit Quiz", 
             command=self.submit_quiz,
             style='Large.TButton'  # Apply large button style
         )
-        self.submit_button.pack(side="bottom", anchor="se", padx=20, pady=10)
+        self.submit_button.grid(row=2, column=0, sticky="se", padx=20, pady=10)
+        
+        # Configure canvas resizing
+        self.center_container.bind("<Configure>", self.on_content_configure)
+        self.content_canvas.bind("<Configure>", self.on_canvas_configure)
+        
+        # Configure mousewheel scrolling
+        self.content_canvas.bind_all("<MouseWheel>", self.on_mousewheel)
+        
+        # Bind mousewheel only when mouse is over canvas
+        self.content_canvas.bind("<Enter>", self.bind_mousewheel)
+        self.content_canvas.bind("<Leave>", self.unbind_mousewheel)
+
+    def on_content_configure(self, event):
+        """Update the scrollregion when the content size changes."""
+        # Get the full size of the content
+        bbox = self.content_canvas.bbox("all")
+        if bbox:
+            # Get the visible height of the canvas
+            canvas_height = self.content_canvas.winfo_height()
+            content_height = bbox[3]  # bbox[3] contains the height of all content
+            
+            # Only enable scrolling if content is taller than the visible area
+            if content_height > canvas_height:
+                # Set scroll region to full content size
+                self.content_canvas.configure(scrollregion=bbox)
+                # Make scrollbar visible
+                self.content_scrollbar.grid(row=0, column=1, sticky="ns")
+            else:
+                # Content fits, so disable scrolling
+                self.content_canvas.configure(scrollregion=(0, 0, bbox[2], canvas_height))
+                # Hide scrollbar when not needed
+                self.content_scrollbar.grid_remove()
+                # Reset view to top
+                self.content_canvas.yview_moveto(0)
+
+    def on_canvas_configure(self, event):
+        """When canvas is resized, also resize the inner frame to match."""
+        width = event.width
+        self.content_canvas.itemconfig(self.content_canvas_window, width=width)
+        # Update wraplength of question_label based on new width
+        self.question_label.configure(wraplength=width-50)
+        
+        # After resizing, check if scrollbar is needed
+        self.root.after(100, self.check_scrollbar_needed)
+
+    def check_scrollbar_needed(self):
+        """Check if scrollbar is needed after resize or content changes."""
+        bbox = self.content_canvas.bbox("all")
+        if bbox:
+            canvas_height = self.content_canvas.winfo_height()
+            content_height = bbox[3]
+            
+            if content_height > canvas_height:
+                self.content_scrollbar.grid(row=0, column=1, sticky="ns")
+            else:
+                self.content_scrollbar.grid_remove()
+                self.content_canvas.yview_moveto(0)  # Reset to top position
+
+    def on_mousewheel(self, event):
+        """Handle mousewheel scrolling."""
+        self.content_canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+
+    def bind_mousewheel(self, event):
+        """Bind the mousewheel event when mouse enters the canvas."""
+        self.content_canvas.bind_all("<MouseWheel>", self.on_mousewheel)
+
+    def unbind_mousewheel(self, event):
+        """Unbind the mousewheel event when mouse leaves the canvas."""
+        self.content_canvas.unbind_all("<MouseWheel>")
 
     def update_question_status(self):
         """Update the visual status of question tracker buttons."""
@@ -1338,29 +1440,10 @@ class QuizRunner:
             # Add separator
             ttk.Separator(self.options_frame, orient='horizontal').pack(fill='x', pady=20)
 
-            # Create scrollable frame for answer details
-            details_container = ttk.Frame(self.options_frame)
-            details_container.pack(fill='both', expand=True)
-
-            # Create canvas and scrollbar
-            details_canvas = tk.Canvas(details_container, height=250)  # Reduced from 300 to 250
-            details_scrollbar = ttk.Scrollbar(details_container, orient='vertical', command=details_canvas.yview)
-
-            # Create frame for content
-            details_frame = ttk.Frame(details_canvas)
+            # Add details directly to the options_frame instead of creating a separate scrollable area
+            details_frame = ttk.Frame(self.options_frame)
+            details_frame.pack(fill='both', expand=True, padx=10)
             
-            # Configure scrolling
-            details_canvas.configure(yscrollcommand=details_scrollbar.set)
-            details_canvas.pack(side='left', fill='both', expand=True)
-            details_scrollbar.pack(side='right', fill='y')
-            
-            # Create window in canvas with fixed width
-            canvas_width = self.options_frame.winfo_width() - 50
-            if canvas_width <= 0:
-                canvas_width = 500
-            
-            details_canvas.create_window((0, 0), window=details_frame, anchor='nw', width=canvas_width)
-
             # Show user's answer with correctness indicator
             user_answer = self.user_answers[self.current_index]
             user_answer_display = ", ".join(user_answer) if isinstance(user_answer, list) else (user_answer or "No answer")
@@ -1389,7 +1472,8 @@ class QuizRunner:
             ttk.Label(
                 details_frame, 
                 text=user_answer_display,
-                font=("Helvetica", 10)
+                font=("Helvetica", 10),
+                wraplength=600
             ).pack(anchor="w", pady=(0, 10))
 
             # Show correct answer
@@ -1403,7 +1487,8 @@ class QuizRunner:
             ttk.Label(
                 details_frame, 
                 text=correct_answers,
-                font=("Helvetica", 10)
+                font=("Helvetica", 10),
+                wraplength=600
             ).pack(anchor="w", pady=(0, 10))
 
             # Show explanation
@@ -1413,36 +1498,27 @@ class QuizRunner:
                 font=("Helvetica", 11, "bold")
             ).pack(anchor="w", pady=(0, 5))
             
-            ttk.Label(
+            explanation_text = ttk.Label(
                 details_frame, 
                 text=current_question.get('explanation', 'No explanation provided.'),
                 font=("Helvetica", 10),
-                wraplength=500,  # Slightly smaller than canvas width
+                wraplength=600,
                 justify="left"
-            ).pack(anchor="w", pady=(0, 10))
-
-            # Update scroll region when content changes
-            def configure_scroll_region(event):
-                details_canvas.configure(scrollregion=details_canvas.bbox("all"))
-            details_frame.bind("<Configure>", configure_scroll_region)
-
-            # Enable mousewheel scrolling
-            def on_mousewheel(event):
-                details_canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
-            details_canvas.bind_all("<MouseWheel>", on_mousewheel)
-
-            # Unbind mousewheel when mouse leaves the canvas
-            def unbind_mousewheel(event):
-                details_canvas.unbind_all("<MouseWheel>")
-            def bind_mousewheel(event):
-                details_canvas.bind_all("<MouseWheel>", on_mousewheel)
-                
-            details_canvas.bind('<Enter>', bind_mousewheel)
-            details_canvas.bind('<Leave>', unbind_mousewheel)
+            )
+            explanation_text.pack(anchor="w", pady=(0, 10), fill="x")
 
         # Update navigation buttons
         self.prev_button.config(state="normal" if self.current_index > 0 else "disabled")
         self.next_button.config(state="normal" if self.current_index < len(self.quiz_questions) - 1 else "disabled")
+        
+        # Ensure scrollbar works correctly with new content
+        self.content_canvas.update_idletasks()
+        
+        # Check if scrollbar is needed based on content height
+        self.check_scrollbar_needed()
+        
+        # Reset to top of content
+        self.content_canvas.yview_moveto(0)
 
     def next_question(self):
         self.save_user_answers()
@@ -1500,8 +1576,11 @@ class QuizRunner:
                 self.create_tooltip(self.tracker_buttons[i], "Incorrect")
 
         # Create and add results summary frame at the top
-        self.results_frame = ttk.Frame(self.quiz_frame)
-        self.results_frame.pack(before=self.center_container, fill="x", padx=20, pady=10)
+        self.results_frame = ttk.Frame(self.content_container)
+        self.results_frame.grid(row=0, column=0, sticky="ew", padx=20, pady=10)
+        
+        # Move timer label to results frame
+        self.timer_label.destroy()  # Remove old timer
         
         results_title = ttk.Label(
             self.results_frame,
@@ -1523,14 +1602,11 @@ class QuizRunner:
             font=("Helvetica", 12, "bold")
         )
         time_label.pack(side="left", padx=20)
-
-        # Update timer display to be blank after submission
-        self.timer_label.config(text="")
         
         # Remove the flag button and add Questions label
         self.flag_button.destroy()
         
-        # Add Questions label
+        # Add Questions label to tracker
         self.questions_label = ttk.Label(
             self.title_frame,
             text="Questions:",
@@ -1538,42 +1614,14 @@ class QuizRunner:
         )
         self.questions_label.pack(side="left", padx=5)
 
-        # Disable submit button and options
+        # Disable submit button
         self.submit_button.config(state="disabled")
-        
-        # Resize window to show all content
-        self.root.update_idletasks()  # Let the window process all changes
-        required_height = self.root.winfo_reqheight() + 100  # Increased padding from 50 to 100
-        current_width = self.root.winfo_width()
-        
-        # Get screen height
-        screen_height = self.root.winfo_screenheight()
-        
-        # Limit height to 90% of screen height if needed
-        if required_height > screen_height * 0.9:
-            required_height = int(screen_height * 0.9)
-        
-        # Set minimum height to ensure buttons are visible
-        min_height = 800  # Minimum height to ensure visibility of all elements
-        required_height = max(required_height, min_height)
-        
-        self.root.geometry(f"{current_width}x{required_height}")
-        
-        # Force an update to ensure proper layout
-        self.root.update()
         
         # Update current question display to show results
         self.update_question()
 
-        # Remove the submit button completely
+        # Remove submit button
         self.submit_button.destroy()
-
-        # Reduce the size of navigation buttons after grading
-        style = ttk.Style()
-        style.configure('GradedNav.TButton', padding=(10, 5), font=('Helvetica', 10))  # Smaller style for graded navigation
-        
-        self.prev_button.configure(style='GradedNav.TButton')
-        self.next_button.configure(style='GradedNav.TButton')
 
         # After adding the time_label, add the export button
         export_button = ttk.Button(
